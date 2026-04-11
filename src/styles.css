@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-darkBg text-white antialiased selection:bg-neonBlue selection:text-white;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Glassmorphism utilities & Strict Aesthetic Overrides */
+@layer utilities {
+  .glass {
+    @apply bg-darkSurface/60 backdrop-blur-md border border-white/5;
+  }
+  
+  /* El requerimiento explícito es NADA de bordes redondos de acuerdo al User */
+  *, *::before, *::after {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .btn-primary {
+    @apply bg-neonBlue text-white font-medium py-2 px-4 transition-colors duration-200 hover:bg-neonBlueHover cursor-pointer;
+  }
+  
+  .input-primary {
+    @apply bg-darkSurface border border-white/10 text-white py-2 px-3 focus:outline-none focus:border-neonBlue transition-colors duration-200 placeholder:text-gray-500;
+  }
+}
