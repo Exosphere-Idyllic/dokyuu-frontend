@@ -1,0 +1,76 @@
+<div class="flex h-screen w-full bg-darkBg text-white overflow-hidden">
+  
+  <!-- Mitad Izquierda (Cuerpo oscuro, acentos de iluminación lejanos - Dual Split) -->
+  <div class="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-darkSurface relative overflow-hidden" style="border-right: 1px solid rgba(255,255,255,0.05)">
+    <!-- Decoración sutil de Neon (Background abstract light blurs) -->
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-neonBlue/10 blur-3xl z-0 pointer-events-none"></div>
+    <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-neonBlueHover/5 blur-3xl z-0 pointer-events-none"></div>
+
+    <div class="z-10">
+      <h1 class="text-3xl font-bold tracking-tight text-white mb-2">Dokyuu</h1>
+      <p class="text-gray-400 max-w-sm">El panel de control interactivo corporativo protegido por tiempo real.</p>
+    </div>
+
+    <div class="z-10 pb-8">
+      <blockquote class="border-l-4 border-neonBlue pl-4 text-gray-300 italic">
+        "Optimizando las infraestructuras de la pizarra sin importar la ubicación geográfica con latencia cero."
+      </blockquote>
+      <div class="mt-4 text-xs font-semibold uppercase text-neonBlue tracking-widest">
+        Sistema de Nube Desplegado
+      </div>
+    </div>
+  </div>
+
+  <!-- Mitad Derecha (Área de Interacción y Formularios en Bloque) -->
+  <div class="w-full lg:w-1/2 flex items-center justify-center p-8 z-10 glass lg:!border-none md:!border-none !border-white/5 relative">
+    
+    <!-- Contenedor estricto sin bordes redondeados y sin sombras, diseño plano agresivo -->
+    <div class="w-full max-w-md bg-darkBg border border-white/10 p-10">
+      
+      <div class="mb-10">
+        <h2 class="text-2xl font-semibold mb-2">
+          {{ isLogin() ? 'Identificarse' : 'Registrar Nuevo Miembro' }}
+        </h2>
+        <p class="text-gray-400 text-sm">
+          {{ isLogin() ? 'Bienvenido a Dokyuu. Ingresa tus credenciales seguras.' : 'Autoriza tu acceso creando un perfil centralizado en TLS.' }}
+        </p>
+      </div>
+
+      <form [formGroup]="authForm" (ngSubmit)="onSubmit()" class="flex flex-col space-y-5">
+        
+        <div *ngIf="!isLogin()" class="flex flex-col">
+          <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Nombre Completo</label>
+          <input type="text" formControlName="name" class="input-primary w-full" placeholder="Ej. Alex Mercer" />
+        </div>
+
+        <div class="flex flex-col">
+          <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Correo Electrónico</label>
+          <input type="email" formControlName="email" class="input-primary w-full" placeholder="usuario@empresa.com" />
+        </div>
+
+        <div class="flex flex-col">
+          <label class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Clave de Seguridad</label>
+          <input type="password" formControlName="password" class="input-primary w-full" placeholder="••••••••" />
+        </div>
+
+        <!-- Alerta de Errores -->
+        <div *ngIf="errorMsg()" class="bg-red-900/20 border border-red-500/50 text-red-400 text-sm p-3 mt-4 font-mono">
+          <span class="font-bold">ERROR:</span> {{ errorMsg() }}
+        </div>
+
+        <button type="submit" [disabled]="loading() || authForm.invalid" class="btn-primary w-full mt-6 text-sm font-semibold tracking-wide disabled:opacity-50">
+          {{ loading() ? 'AUTENTICANDO...' : (isLogin() ? 'ACCEDER A LA PLATAFORMA' : 'CREAR PERFIL') }}
+        </button>
+
+      </form>
+
+      <div class="mt-8 pt-6 border-t border-white/5 text-center">
+        <button type="button" (click)="toggleMode()" class="text-sm text-neonBlue hover:text-white transition-colors">
+          {{ isLogin() ? '¿No cuentas con autorización? Solicita tu cuenta.' : '¿Ya eres miembro? Inicia sesión directa.' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>

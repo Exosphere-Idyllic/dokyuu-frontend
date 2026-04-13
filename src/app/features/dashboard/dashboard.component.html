@@ -1,0 +1,132 @@
+<div class="flex h-screen w-full bg-darkBg text-white overflow-hidden font-sans">
+  
+  <!-- Sidebar Elegante -->
+  <aside class="w-64 bg-darkSurface border-r border-white/5 flex flex-col justify-between py-8 px-6">
+    <div>
+      <h2 class="text-2xl font-bold tracking-tight text-white mb-2">Dokyuu</h2>
+      <p class="text-xs text-neonBlue font-semibold uppercase tracking-widest mb-10">Lobby Global</p>
+      
+      <nav class="flex flex-col gap-2">
+        <button class="text-left w-full px-4 py-3 bg-neonBlue/10 text-neonBlue border-l-2 border-neonBlue text-sm font-medium transition-all">
+          Pizarras Desplegadas
+        </button>
+      </nav>
+    </div>
+
+    <!-- User & Logout -->
+    <div class="border-t border-white/10 pt-6">
+      <div class="text-sm text-gray-400 mb-4 truncate" title="{{ authService.currentUser()?.email }}">
+        Usuario: <span class="text-white">{{ authService.currentUser()?.email }}</span>
+      </div>
+      <button (click)="logout()" class="w-full mt-2 text-left text-xs bg-red-900/20 text-red-400 hover:text-red-300 border border-red-500/20 px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between">
+        Cerrar Sesión <span>✕</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-y-auto p-10 relative">
+    <div class="absolute -top-40 -right-40 w-96 h-96 bg-neonBlue/5 blur-3xl z-0 pointer-events-none"></div>
+
+    <div class="max-w-6xl mx-auto z-10 relative">
+      <div class="flex items-end justify-between mb-12">
+        <div>
+          <h1 class="text-3xl font-semibold mb-2">Selección de Proyecto</h1>
+          <p class="text-gray-400">Escoge una infraestructura base o únete a un despliegue externo mediante un código.</p>
+        </div>
+        <div class="flex gap-4">
+          <button (click)="showJoinModal.set(true)" class="border border-white/10 bg-darkSurface hover:bg-white/5 text-white py-2 px-6 text-sm font-semibold transition-colors duration-200">
+            Ingresar Código
+          </button>
+          <button (click)="showCreateModal.set(true)" class="btn-primary py-2 px-6">
+            Desplegar Pizarra
+          </button>
+        </div>
+      </div>
+
+      <!-- Host Boards -->
+      <section class="mb-12">
+        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-6 border-b border-white/5 pb-2">Tus Pizarras Propias (Host)</h3>
+        
+        <div *ngIf="hostBoards().length === 0" class="glass p-8 text-center border-dashed border-white/20">
+          <p class="text-gray-400 text-sm">No tienes administraciones activas en este nodo.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <article *ngFor="let board of hostBoards()" 
+                   (click)="openBoard(board._id)"
+                   class="glass p-6 hover:border-neonBlue/50 cursor-pointer transition-colors group relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-2 opacity-50 text-[10px] uppercase bg-neonBlue/20 text-neonBlue tracking-wider font-bold">Propietario</div>
+            <h4 class="text-lg font-semibold mb-2 mt-4 group-hover:text-neonBlue transition-colors">{{ board.title }}</h4>
+            <p class="text-sm text-gray-400 mb-6 line-clamp-2 h-10">{{ board.description || 'Sin resumen provisto.' }}</p>
+            <div class="flex justify-between items-center text-[11px] text-gray-500 border-t border-white/5 pt-4">
+              <span class="uppercase tracking-widest text-gray-600">Member: <b class="text-gray-300 tracking-normal">{{board.memberCode}}</b></span>
+              <span class="uppercase tracking-widest text-gray-600">Reader: <b class="text-gray-300 tracking-normal">{{board.readerCode}}</b></span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Guest Boards -->
+      <section>
+        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-6 border-b border-white/5 pb-2">Despliegues Externos (Accesos)</h3>
+        
+        <div *ngIf="guestBoards().length === 0" class="glass p-8 text-center border-dashed border-white/20">
+          <p class="text-gray-400 text-sm">No estás vinculado como invitado a ninguna infraestructura remota.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <article *ngFor="let invite of guestBoards()" 
+                   (click)="openBoard(invite.boardId._id)"
+                   class="glass p-6 hover:border-white/20 cursor-pointer transition-colors group relative">
+            <div class="absolute top-0 right-0 p-2 opacity-60 text-[10px] font-bold uppercase tracking-wider"
+                 [ngClass]="invite.role === 'reader' ? 'bg-orange-500/20 text-orange-400' : 'bg-white/10 text-white'">
+              Rol: {{ invite.role }}
+            </div>
+            <h4 class="text-lg font-semibold mb-2 mt-4 group-hover:text-white text-gray-200 transition-colors">{{ invite.boardId.title }}</h4>
+            <p class="text-sm text-gray-400 line-clamp-2 h-10">{{ invite.boardId.description || 'Sin resumen provisto.' }}</p>
+          </article>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- Modal Create -->
+<div *ngIf="showCreateModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-lg">
+    <h3 class="text-xl font-bold mb-6">Desplegar Nueva Infraestructura</h3>
+    <div class="flex flex-col gap-4">
+      <div>
+        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Nombre del Proyecto</label>
+        <input type="text" [(ngModel)]="newTitle" class="input-primary w-full" placeholder="Ej. Arquitectura V2">
+      </div>
+      <div>
+        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Resumen (Opcional)</label>
+        <textarea [(ngModel)]="newDesc" class="input-primary w-full h-24 resize-none" placeholder="Contexto de esta pizarra..."></textarea>
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/5">
+      <button (click)="showCreateModal.set(false)" class="px-6 py-2 text-sm text-gray-400 hover:text-white transition-colors">Abortar</button>
+      <button (click)="createBoard()" [disabled]="!newTitle || loading()" class="btn-primary disabled:opacity-50 text-sm">Ejecutar Construcción</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Join -->
+<div *ngIf="showJoinModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-sm">
+    <h3 class="text-xl font-bold mb-6">Vincularse con Tokens</h3>
+    <div class="flex flex-col gap-4">
+      <div>
+        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Token Hash (Reader / Member)</label>
+        <input type="text" [(ngModel)]="joinCode" class="input-primary w-full tracking-widest text-center text-lg uppercase" placeholder="K3P-X9P">
+      </div>
+    </div>
+    <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/5">
+      <button (click)="showJoinModal.set(false)" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
+      <button (click)="joinBoard()" [disabled]="!joinCode || loading()" class="btn-primary disabled:opacity-50 text-sm">Verificar e Ingresar</button>
+    </div>
+  </div>
+</div>
