@@ -1,0 +1,73 @@
+<div class="relative w-screen h-screen overflow-hidden bg-darkBg" style="background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px;">
+  
+  <!-- Interface de Control (UI Topbar) -->
+  <header class="absolute top-0 left-0 w-full p-4 glass z-50 flex items-center justify-between pointer-events-auto shadow-none !border-t-0 !border-x-0 border-white/10">
+    <div class="flex items-center gap-4">
+      <button (click)="goBack()" class="text-gray-400 hover:text-white transition-colors font-bold text-xl px-2 cursor-pointer">&larr;</button>
+      <div class="border-l border-white/20 pl-4">
+         <h1 class="text-sm font-bold tracking-widest text-white uppercase mb-1">Entorno Desplegado</h1>
+         <div class="flex items-center gap-2">
+           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+           <span class="text-[10px] uppercase text-emerald-500 font-mono tracking-widest">TLS Conectado Ocupacionalmente</span>
+         </div>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-6">
+      <div *ngIf="isSaving" class="text-[10px] text-neonBlue uppercase tracking-widest animate-pulse font-semibold">
+        Guardando a MongoDB...
+      </div>
+      <button (click)="addNote()" class="btn-primary flex items-center justify-center gap-2 text-xs uppercase tracking-widest font-bold !py-2 px-6">
+        <span>+</span> Añadir Adhesivo
+      </button>
+    </div>
+  </header>
+
+  <!-- Capa de Lienzo Infinito Colaborativo -->
+  <div class="absolute inset-0 z-10 w-full h-full pointer-events-auto">
+    <!-- Nodos (Post-its Digitales) renderizables -->
+    <ng-container *ngFor="let note of canvasService.elements()">
+      <!-- Wrapper Físico del Nodo -->
+      <div class="absolute shadow-none ring-1 ring-white/10"
+           [style.left.px]="note.x" [style.top.px]="note.y"
+           [ngStyle]="{'background-color': note.color}"
+           (mousedown)="startDrag($event, note)"
+           style="width: 250px; border-radius: 0;">
+           
+        <!-- Menú superior para Mover y Borrar -->
+        <div class="bg-black/40 px-2 py-0.5 flex justify-between items-center select-none cursor-move">
+          <span class="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Node-{{note.id | slice:0:4}}</span>
+          <button (click)="deleteNote(note.id)" class="text-red-500/80 hover:text-red-400 font-black cursor-pointer px-1">×</button>
+        </div>
+        
+        <!-- Editor Múltiple de Contenido (Textarea) -->
+        <textarea 
+          [ngModel]="note.content" 
+          (ngModelChange)="updateContent(note, $event)"
+          class="w-full h-32 p-3 bg-transparent text-gray-200 focus:outline-none resize-none text-sm font-medium focus:ring-[1px] focus:ring-neonBlue/50"
+          placeholder="Escribe text plano..."></textarea>
+      </div>
+    </ng-container>
+
+    <!-- Visualización Fantasma de Aliados Activos (Cursores WSS) -->
+    <ng-container *ngFor="let kv of canvasService.activeCursors() | keyvalue">
+      <div *ngIf="kv.value.userId !== authService.currentUser()?.sub" 
+           class="absolute pointer-events-none transition-all duration-75 ease-linear pointer-events-none z-40"
+           [style.left.px]="kv.value.position.x" 
+           [style.top.px]="kv.value.position.y">
+        
+        <!-- Flecha Vectorizada de Precisión del Cursor -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]">
+          <path d="M4.35716 3.6358L20.25 10.9632L11.5179 13.985M4.35716 3.6358L10.3259 19.985L11.5179 13.985M4.35716 3.6358L11.5179 13.985" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M4.35716 3.6358L20.25 10.9632L11.5179 13.985L10.3259 19.985L4.35716 3.6358Z" fill="#3B82F6"/>
+        </svg>
+
+        <!-- Tooltip Naranja/NeoBlue con sus Identificadores -->
+        <div class="ml-4 mt-1 bg-neonBlue px-2 py-0.5 text-[10px] rounded-none border border-transparent text-white font-bold tracking-wider shadow-none flex max-w-[150px] truncate">
+          {{ kv.value.email.split('@')[0] }}
+        </div>
+      </div>
+    </ng-container>
+
+  </div>
+</div>
