@@ -4,7 +4,7 @@ import { environment } from '../../../environments/environment';
 
 export interface Board {
   _id: string;
-  title: string;
+  name: string;
   description: string;
   memberCode: string;
   readerCode: string;
@@ -20,11 +20,11 @@ export class BoardsService {
   private apiUrl = environment.apiUrl + '/boards';
 
   getBoards() {
-    return this.http.get<{ hostBoards: Board[], memberBoards: any[] }>(this.apiUrl);
+    return this.http.get<any[]>(this.apiUrl);
   }
 
-  createBoard(title: string, description: string) {
-    return this.http.post<Board>(this.apiUrl, { title, description });
+  createBoard(name: string, description: string) {
+    return this.http.post<Board>(this.apiUrl, { name, description });
   }
 
   joinBoard(code: string) {

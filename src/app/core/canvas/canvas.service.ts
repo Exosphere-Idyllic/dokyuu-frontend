@@ -28,21 +28,48 @@ export class CanvasService {
   public activeCursors = signal<Record<string, CursorPosition>>({});
 
   connect(boardId: string, token: string) {
-    this.socket = io(environment.apiUrl, { 
+    // Si ya hay un socket activo, desconectarlo limpiamente antes de crear uno nuevo.
+    // Esto previene que eventos de tableros anteriores contaminen la sesión actual.
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+    }
+
+    this.socket = io(environment.apiUrl, {
       auth: { token },
-      transports: ['websocket']
+      transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
+    // CORRECCIÓN CRÍTICA: El único punto de entrada para unirse a la sala es el evento
+    // 'connect'. No verificamos this.socket.connected porque justo después de io() el
+    // socket siempre está en proceso de conexión (connected === false). Registrar 'connect'
+    // es la única forma confiable de garantizar que joinBoard se emita una sola vez.
     this.socket.on('connect', () => {
+      console.log(`[WSS] Conectado (${this.socket.id}). Uniéndose al tablero ${boardId}...`);
       this.socket.emit('joinBoard', { boardId }, (res: any) => {
-        console.log('🔗 WSS Vinculado Exitosamente:', res);
+        if (res?.success) {
+          console.log('🔗 WSS Vinculado Exitosamente:', res);
+        } else {
+          console.error('❌ joinBoard rechazado:', res);
+        }
       });
     });
 
+    this.socket.on('connect_error', (e) => console.warn('[WSS] Error de conexión:', e.message));
+
+    this.socket.on('disconnect', (reason) => {
+      console.warn('[WSS] Desconectado:', reason);
+    });
+
+    // Recibir actualizaciones del canvas provenientes de OTROS usuarios vía broadcast
     this.socket.on('canvas:update', (incomingElements: BoardElement[]) => {
       this.elements.set(incomingElements);
     });
 
+    // Recibir posiciones de cursores de otros usuarios
     this.socket.on('cursor:move', (data: CursorPosition) => {
       this.activeCursors.update(cursors => ({ ...cursors, [data.userId]: data }));
     });

@@ -26,7 +26,7 @@
   <!-- Capa de Lienzo Infinito Colaborativo -->
   <div class="absolute inset-0 z-10 w-full h-full pointer-events-auto">
     <!-- Nodos (Post-its Digitales) renderizables -->
-    <ng-container *ngFor="let note of canvasService.elements()">
+    <ng-container *ngFor="let note of canvasService.elements(); trackBy: trackByNoteId">
       <!-- Wrapper Físico del Nodo -->
       <div class="absolute shadow-none ring-1 ring-white/10"
            [style.left.px]="note.x" [style.top.px]="note.y"

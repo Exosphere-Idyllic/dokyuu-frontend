@@ -144,4 +144,9 @@ export class BoardComponent implements OnInit, OnDestroy {
   goBack() {
     this.router.navigate(['/dashboard']);
   }
+
+  // Prevención de re-renderizado destructivo de Angular
+  trackByNoteId(index: number, note: BoardElement) {
+    return note.id;
+  }
 }

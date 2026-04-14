@@ -41,8 +41,13 @@ export class AuthService {
   }
 
   private saveSession(res: any) {
+    // CORRECCIÓN: El backend retorna user._id (no user.sub).
+    // Normalizamos a sub para que el resto de la app use un campo consistente.
+    const sub = res.user.sub || res.user._id;
+    const sessionData = { email: res.user.email, sub };
+
     localStorage.setItem('dokyuu_token', res.access_token);
-    localStorage.setItem('dokyuu_user', JSON.stringify(res.user));
-    this.currentUser.set({ token: res.access_token, email: res.user.email, sub: res.user.sub });
+    localStorage.setItem('dokyuu_user', JSON.stringify(sessionData));
+    this.currentUser.set({ token: res.access_token, email: res.user.email, sub });
   }
 }

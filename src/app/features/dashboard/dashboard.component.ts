@@ -34,9 +34,18 @@ export class DashboardComponent implements OnInit {
 
   fetchBoards() {
     this.boardsService.getBoards().subscribe({
-      next: (res: any) => {
-        this.hostBoards.set(res.hostBoards);
-        this.guestBoards.set(res.memberBoards);
+      next: (boards: any[]) => {
+        const hosts = boards.filter(b => b.myRole === 'host');
+        // CORRECCIÓN: estructura plana y explícita en vez de anidar en boardId
+        const guests = boards.filter(b => b.myRole !== 'host').map(b => ({
+          _id: b._id,
+          name: b.name,
+          description: b.description,
+          role: b.myRole
+        }));
+        
+        this.hostBoards.set(hosts);
+        this.guestBoards.set(guests);
       }
     });
   }
