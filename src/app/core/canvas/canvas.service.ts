@@ -5,18 +5,29 @@ import { environment } from '../../../environments/environment';
 
 export interface BoardElement {
   id: string;
-  type: 'note';
+  type: 'note' | 'image';
   content: string;
   x: number;
   y: number;
   color: string;
   createdBy: string;
+  imageUrl?: string;   // URL de Cloudinary — presente solo si type === 'image'
+  width?: number;      // Ancho en px del elemento imagen
+  height?: number;     // Alto en px del elemento imagen
 }
 
 export interface CursorPosition {
   userId: string;
   email: string;
   position: { x: number; y: number };
+}
+
+export interface CloudinaryUploadResult {
+  message: string;
+  url: string;
+  publicId: string;
+  width: number;
+  height: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -88,7 +99,14 @@ export class CanvasService {
     }
   }
 
-  // Persistencia MongoDB
+  // ─── Cloudinary ───────────────────────────────────────────────────────────
+  uploadImage(file: File) {
+    const formData = new FormData();
+    formData.append('image', file);
+    return this.http.post<CloudinaryUploadResult>(`${environment.apiUrl}/files/upload`, formData);
+  }
+
+  // ─── Persistencia MongoDB ─────────────────────────────────────────────────
   loadElements(boardId: string) {
     return this.http.get<BoardElement[]>(`${environment.apiUrl}/canvas/${boardId}/elements`);
   }
@@ -99,6 +117,7 @@ export class CanvasService {
 
   disconnect() {
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.disconnect();
       this.activeCursors.set({});
     }

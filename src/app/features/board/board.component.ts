@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CanvasService, BoardElement } from '../../core/canvas/canvas.service';
@@ -20,7 +20,12 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   boardId!: string;
   isSaving = false;
+  isUploadingImage = false;
+  uploadError: string | null = null;
   hasRoleAccess = true;
+
+  // Referencia al input oculto de archivos para activarlo con el botón
+  @ViewChild('imageInput') imageInputRef!: ElementRef<HTMLInputElement>;
 
   // RxJS Subjects para optimización extrema y prevenir saturación
   private cursorSubject = new Subject<{x: number, y: number}>();
@@ -61,10 +66,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.isSaving = true;
       this.canvasService.saveElements(this.boardId, elements).subscribe({
         next: () => this.isSaving = false,
-        error: () => {
-          this.isSaving = false;
-          // Si el Backend responde error de rol, el Canvas Controller bloquea
-        }
+        error: () => this.isSaving = false,
       });
     });
   }
@@ -76,7 +78,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   // --- OYENTES DE EVENTOS FÍSICOS WINDOWS/MAC ---
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
-    this.cursorSubject.next({ x: e.clientX, y: e.clientY }); // Notificar ubicación constantemente
+    this.cursorSubject.next({ x: e.clientX, y: e.clientY });
 
     if (this.draggingId) {
       const current = this.canvasService.elements();
@@ -86,7 +88,6 @@ export class BoardComponent implements OnInit, OnDestroy {
         }
         return el;
       });
-      // El cambio de posición del post-it viaja por Socket Inmediatamente a los demás miembros
       this.canvasService.emitCanvasUpdate(this.boardId, updated);
     }
   }
@@ -95,12 +96,11 @@ export class BoardComponent implements OnInit, OnDestroy {
   onMouseUp() {
     if (this.draggingId) {
       this.draggingId = null;
-      // Inicia el contador de MongoDB de 2 segundos para guardarlo
       this.saveSubject.next(this.canvasService.elements());
     }
   }
 
-  // --- MOTOR PREDICITVO DOM ---
+  // --- MOTOR DE ELEMENTOS ---
   addNote() {
     const user = this.authService.currentUser();
     const newNote: BoardElement = {
@@ -109,7 +109,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       content: 'Ingresa texto estratégico...',
       x: window.innerWidth / 2 - 125,
       y: window.innerHeight / 2 - 80,
-      color: '#121215', 
+      color: '#121215',
       createdBy: user?.sub!
     };
 
@@ -118,23 +118,81 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.saveSubject.next(updated);
   }
 
+  // Abre el selector de archivos nativo del sistema operativo
+  triggerImageUpload() {
+    this.uploadError = null;
+    this.imageInputRef.nativeElement.value = ''; // Resetear para permitir subir el mismo archivo de nuevo
+    this.imageInputRef.nativeElement.click();
+  }
+
+  // Recibe el archivo seleccionado, lo sube a Cloudinary y crea el elemento en el canvas
+  onImageFileSelected(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    // Validación de tamaño en el cliente antes de siquiera intentar subir
+    if (file.size > 8 * 1024 * 1024) {
+      this.uploadError = 'El archivo supera el límite de 8MB.';
+      return;
+    }
+
+    this.isUploadingImage = true;
+    this.uploadError = null;
+
+    this.canvasService.uploadImage(file).subscribe({
+      next: (res: { url: string; publicId: string; width: number; height: number; message: string }) => {
+        const user = this.authService.currentUser();
+
+        // Calcular dimensiones: mantener proporción pero con límite máximo de 400x300
+        const MAX_W = 400;
+        const MAX_H = 300;
+        const ratio = Math.min(MAX_W / res.width, MAX_H / res.height, 1);
+        const displayW = Math.round(res.width * ratio);
+        const displayH = Math.round(res.height * ratio);
+
+        const newImage: BoardElement = {
+          id: Math.random().toString(36).substr(2, 9),
+          type: 'image',
+          content: file.name, // Nombre del archivo como label accesible
+          x: Math.max(0, window.innerWidth / 2 - displayW / 2),
+          y: Math.max(60, window.innerHeight / 2 - displayH / 2),
+          color: 'transparent',
+          createdBy: user?.sub!,
+          imageUrl: res.url,
+          width: displayW,
+          height: displayH,
+        };
+
+        const updated = [...this.canvasService.elements(), newImage];
+        this.canvasService.emitCanvasUpdate(this.boardId, updated);
+        this.saveSubject.next(updated);
+        this.isUploadingImage = false;
+      },
+      error: (err: { error?: { message?: string } }) => {
+        this.uploadError = err?.error?.message || 'Error al subir la imagen. Intenta de nuevo.';
+        this.isUploadingImage = false;
+      }
+    });
+  }
+
   startDrag(e: MouseEvent, note: BoardElement) {
-    // Evitar arrastrar si da clic literal en las letras para editar
-    if ((e.target as HTMLElement).tagName.toLowerCase() === 'textarea') return; 
-    
+    // Evitar arrastrar si da clic en la textarea (notas) o en la imagen directamente
+    const tag = (e.target as HTMLElement).tagName.toLowerCase();
+    if (tag === 'textarea' || tag === 'button') return;
+
     this.draggingId = note.id;
     this.dragOffsetX = e.clientX - note.x;
     this.dragOffsetY = e.clientY - note.y;
   }
 
   updateContent(note: BoardElement, newContent: string) {
-    const updated = this.canvasService.elements().map(n => 
+    const updated = this.canvasService.elements().map(n =>
       n.id === note.id ? { ...n, content: newContent } : n
     );
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
   }
-  
+
   deleteNote(id: string) {
     const updated = this.canvasService.elements().filter(n => n.id !== id);
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
