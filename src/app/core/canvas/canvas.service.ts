@@ -5,15 +5,17 @@ import { environment } from '../../../environments/environment';
 
 export interface BoardElement {
   id: string;
-  type: 'note' | 'image';
+  type: 'note' | 'image' | 'shape';
   content: string;
   x: number;
   y: number;
   color: string;
   createdBy: string;
   imageUrl?: string;   // URL de Cloudinary — presente solo si type === 'image'
-  width?: number;      // Ancho en px del elemento imagen
-  height?: number;     // Alto en px del elemento imagen
+  width?: number;      // Ancho en px del elemento 
+  height?: number;     // Alto en px del elemento
+  shapeType?: 'square' | 'circle' | 'triangle' | 'arrow' | 'line'; // Tipo de figura
+  rotation?: number;   // Rotación en grados
 }
 
 export interface CursorPosition {

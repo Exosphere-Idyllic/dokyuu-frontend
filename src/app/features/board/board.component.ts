@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CanvasService, BoardElement } from '../../core/canvas/canvas.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { BoardsService } from '../../core/boards/boards.service';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime } from 'rxjs';
 
@@ -15,6 +16,7 @@ import { Subject, debounceTime } from 'rxjs';
 export class BoardComponent implements OnInit, OnDestroy {
   canvasService = inject(CanvasService);
   authService = inject(AuthService);
+  boardsService = inject(BoardsService);
   route = inject(ActivatedRoute);
   router = inject(Router);
 
@@ -23,6 +25,9 @@ export class BoardComponent implements OnInit, OnDestroy {
   isUploadingImage = false;
   uploadError: string | null = null;
   hasRoleAccess = true;
+  
+  boardName: string = 'Cargando...';
+  boardRole: string = 'Conectando...';
 
   // Referencia al input oculto de archivos para activarlo con el botón
   @ViewChild('imageInput') imageInputRef!: ElementRef<HTMLInputElement>;
@@ -34,6 +39,17 @@ export class BoardComponent implements OnInit, OnDestroy {
   draggingId: string | null = null;
   dragOffsetX = 0;
   dragOffsetY = 0;
+  resizingId: string | null = null;
+  resizeStartW = 0;
+  resizeStartH = 0;
+  isRotatingId: string | null = null;
+
+  // --- Pan / Infinite Canvas ---
+  isPanning = false;
+  panX = 0;
+  panY = 0;
+  lastPanX = 0;
+  lastPanY = 0;
 
   ngOnInit() {
     this.boardId = this.route.snapshot.paramMap.get('id')!;
@@ -47,6 +63,15 @@ export class BoardComponent implements OnInit, OnDestroy {
        this.router.navigate(['/auth']);
        return;
     }
+
+    this.boardsService.getBoards().subscribe((boards: any[]) => {
+      const currentBoard = boards.find(b => b._id === this.boardId);
+      if (currentBoard) {
+        this.boardName = currentBoard.name;
+        this.boardRole = currentBoard.myRole === 'host' ? 'Host' : 
+                         currentBoard.myRole === 'member' ? 'Member' : 'Reader';
+      }
+    });
 
     // Levantar túnel de conexión en tiempo real
     this.canvasService.connect(this.boardId, token);
@@ -76,9 +101,68 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   // --- OYENTES DE EVENTOS FÍSICOS WINDOWS/MAC ---
+  startPan(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    // Iniciamos pan si hacemos clic en el wrapper del canvas (fondo)
+    if (target.classList.contains('canvas-wrapper') || target.classList.contains('canvas-layer')) {
+      this.isPanning = true;
+      this.lastPanX = e.clientX;
+      this.lastPanY = e.clientY;
+    }
+  }
+
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
-    this.cursorSubject.next({ x: e.clientX, y: e.clientY });
+    this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY });
+
+    if (this.isPanning) {
+      this.panX += e.clientX - this.lastPanX;
+      this.panY += e.clientY - this.lastPanY;
+      this.lastPanX = e.clientX;
+      this.lastPanY = e.clientY;
+      return;
+    }
+
+    if (this.isRotatingId) {
+      const current = this.canvasService.elements();
+      const updated = current.map(el => {
+        if (el.id === this.isRotatingId) {
+          const w = el.type === 'note' ? 250 : (el.width || 100);
+          const h = el.type === 'note' ? 144 : (el.height || 100);
+          const centerX = el.x + w / 2;
+          const centerY = el.y + h / 2;
+          const mouseX = e.clientX - this.panX;
+          const mouseY = e.clientY - this.panY;
+          let angle = Math.atan2(mouseY - centerY, mouseX - centerX) * (180 / Math.PI);
+          angle = angle + 90; // offset so dragging from top handle is 0 rotation
+          return { ...el, rotation: angle };
+        }
+        return el;
+      });
+      this.canvasService.elements.set(updated);
+      this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY });
+      return;
+    }
+
+    if (this.resizingId) {
+      const dx = e.clientX - this.lastPanX;
+      const dy = e.clientY - this.lastPanY;
+      const current = this.canvasService.elements();
+      const updated = current.map(el => {
+        if (el.id === this.resizingId) {
+          return { 
+            ...el, 
+            width: Math.max(20, this.resizeStartW + dx), 
+            height: Math.max(20, this.resizeStartH + dy) 
+          };
+        }
+        return el;
+      });
+      // We only emit locally rapidly to not saturate, saveSubject handles DB
+      this.canvasService.elements.set(updated);
+      this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY }); // prevent stutter
+      return;
+    }
 
     if (this.draggingId) {
       const current = this.canvasService.elements();
@@ -94,6 +178,20 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   @HostListener('mouseup')
   onMouseUp() {
+    this.isPanning = false;
+    
+    if (this.resizingId) {
+      this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
+      this.saveSubject.next(this.canvasService.elements());
+      this.resizingId = null;
+    }
+
+    if (this.isRotatingId) {
+      this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
+      this.saveSubject.next(this.canvasService.elements());
+      this.isRotatingId = null;
+    }
+
     if (this.draggingId) {
       this.draggingId = null;
       this.saveSubject.next(this.canvasService.elements());
@@ -107,8 +205,8 @@ export class BoardComponent implements OnInit, OnDestroy {
       id: Math.random().toString(36).substr(2, 9),
       type: 'note',
       content: 'Ingresa texto estratégico...',
-      x: window.innerWidth / 2 - 125,
-      y: window.innerHeight / 2 - 80,
+      x: window.innerWidth / 2 - 125 - this.panX,
+      y: window.innerHeight / 2 - 80 - this.panY,
       color: '#121215',
       createdBy: user?.sub!
     };
@@ -116,6 +214,48 @@ export class BoardComponent implements OnInit, OnDestroy {
     const updated = [...this.canvasService.elements(), newNote];
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
+  }
+
+  addShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line') {
+    const user = this.authService.currentUser();
+    const newShape: BoardElement = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'shape',
+      shapeType: shape,
+      content: '',
+      x: window.innerWidth / 2 - 50 - this.panX,
+      y: window.innerHeight / 2 - 50 - this.panY,
+      width: 100,
+      height: 100,
+      color: '#3B82F6', // Color default (ej. neonBlue-ish)
+      createdBy: user?.sub!
+    };
+
+    const updated = [...this.canvasService.elements(), newShape];
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  changeColor(id: string, color: string) {
+    const updated = this.canvasService.elements().map(n =>
+      n.id === id ? { ...n, color } : n
+    );
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  startResize(e: MouseEvent, note: BoardElement) {
+    e.stopPropagation(); // Evitar arrastrar el elemento principal
+    this.resizingId = note.id;
+    this.resizeStartW = note.width || 100;
+    this.resizeStartH = note.height || 100;
+    this.lastPanX = e.clientX;
+    this.lastPanY = e.clientY;
+  }
+
+  startRotate(e: MouseEvent, note: BoardElement) {
+    e.stopPropagation();
+    this.isRotatingId = note.id;
   }
 
   // Abre el selector de archivos nativo del sistema operativo
@@ -154,8 +294,8 @@ export class BoardComponent implements OnInit, OnDestroy {
           id: Math.random().toString(36).substr(2, 9),
           type: 'image',
           content: file.name, // Nombre del archivo como label accesible
-          x: Math.max(0, window.innerWidth / 2 - displayW / 2),
-          y: Math.max(60, window.innerHeight / 2 - displayH / 2),
+          x: Math.max(0, window.innerWidth / 2 - displayW / 2) - this.panX,
+          y: Math.max(60, window.innerHeight / 2 - displayH / 2) - this.panY,
           color: 'transparent',
           createdBy: user?.sub!,
           imageUrl: res.url,
