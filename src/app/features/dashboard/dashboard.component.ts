@@ -21,10 +21,15 @@ export class DashboardComponent implements OnInit {
 
   showCreateModal = signal(false);
   showJoinModal = signal(false);
+  showEditModal = signal(false);
   
   newTitle = '';
   newDesc = '';
   joinCode = '';
+
+  editBoardId = '';
+  editTitle = '';
+  editDesc = '';
   
   loading = signal(false);
 
@@ -84,6 +89,27 @@ export class DashboardComponent implements OnInit {
         alert(e.error?.message || 'Código inválido');
         this.loading.set(false);
       }
+    });
+  }
+
+  openEditModal(event: Event, board: Board) {
+    event.stopPropagation();
+    this.editBoardId = board._id;
+    this.editTitle = board.name;
+    this.editDesc = board.description || '';
+    this.showEditModal.set(true);
+  }
+
+  updateBoard() {
+    if (!this.editTitle) return;
+    this.loading.set(true);
+    this.boardsService.updateBoard(this.editBoardId, this.editTitle, this.editDesc).subscribe({
+      next: () => {
+        this.showEditModal.set(false);
+        this.loading.set(false);
+        this.fetchBoards();
+      },
+      error: () => this.loading.set(false) 
     });
   }
 

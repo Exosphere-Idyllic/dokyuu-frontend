@@ -96,7 +96,8 @@
 
   <!-- Capa de Lienzo Infinito Colaborativo -->
   <div class="absolute inset-0 z-10 w-full h-full pointer-events-auto canvas-layer"
-       [style.transform]="'translate(' + panX + 'px, ' + panY + 'px)'">
+       [style.transform]="'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoom + ')'"
+       style="transform-origin: 0 0;">
 
     <!-- Nodos (Post-its y Fotos) renderizables -->
     <ng-container *ngFor="let note of canvasService.elements(); trackBy: trackByNoteId">
@@ -263,5 +264,17 @@
       </div>
     </ng-container>
 
+  </div>
+
+  <!-- UI: Barra de Control de Zoom -->
+  <div class="fixed right-4 top-1/2 -translate-y-1/2 z-[60] flex flex-col items-center gap-2 bg-black/60 backdrop-blur border border-white/10 p-2 rounded-full shadow-xl transition-opacity duration-300 pointer-events-auto"
+       [ngClass]="isZoomingUiVisible ? 'opacity-100' : 'opacity-0 hover:opacity-100'">
+    <button (click)="changeZoom(0.1)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/20 hover:scale-110 text-white flex items-center justify-center font-bold transition-all text-xl shadow-inner">+</button>
+    
+    <div class="text-[11px] font-mono text-gray-300 font-bold bg-white/10 py-3 px-0.5 w-[36px] text-center rounded-full my-1 shadow-inner select-none cursor-default" [title]="'Factor: ' + zoom.toFixed(2)">
+      {{ (zoom * 100) | number:'1.0-0' }}%
+    </div>
+    
+    <button (click)="changeZoom(-0.1)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/20 hover:scale-110 text-white flex items-center justify-center font-bold transition-all text-2xl shadow-inner pb-1">-</button>
   </div>
 </div>

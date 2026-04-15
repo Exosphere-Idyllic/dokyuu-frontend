@@ -44,12 +44,16 @@ export class BoardComponent implements OnInit, OnDestroy {
   resizeStartH = 0;
   isRotatingId: string | null = null;
 
-  // --- Pan / Infinite Canvas ---
+  // --- Pan & Zoom / Infinite Canvas ---
   isPanning = false;
   panX = 0;
   panY = 0;
   lastPanX = 0;
   lastPanY = 0;
+  zoom = 1;
+
+  isZoomingUiVisible = false;
+  private zoomTimeout: any;
 
   ngOnInit() {
     this.boardId = this.route.snapshot.paramMap.get('id')!;
@@ -111,9 +115,11 @@ export class BoardComponent implements OnInit, OnDestroy {
     }
   }
 
+
+
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
-    this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY });
+    this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom });
 
     if (this.isPanning) {
       this.panX += e.clientX - this.lastPanX;
@@ -131,8 +137,8 @@ export class BoardComponent implements OnInit, OnDestroy {
           const h = el.type === 'note' ? 144 : (el.height || 100);
           const centerX = el.x + w / 2;
           const centerY = el.y + h / 2;
-          const mouseX = e.clientX - this.panX;
-          const mouseY = e.clientY - this.panY;
+          const mouseX = (e.clientX - this.panX) / this.zoom;
+          const mouseY = (e.clientY - this.panY) / this.zoom;
           let angle = Math.atan2(mouseY - centerY, mouseX - centerX) * (180 / Math.PI);
           angle = angle + 90; // offset so dragging from top handle is 0 rotation
           return { ...el, rotation: angle };
@@ -140,13 +146,13 @@ export class BoardComponent implements OnInit, OnDestroy {
         return el;
       });
       this.canvasService.elements.set(updated);
-      this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY });
+      this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom });
       return;
     }
 
     if (this.resizingId) {
-      const dx = e.clientX - this.lastPanX;
-      const dy = e.clientY - this.lastPanY;
+      const dx = (e.clientX - this.lastPanX) / this.zoom;
+      const dy = (e.clientY - this.lastPanY) / this.zoom;
       const current = this.canvasService.elements();
       const updated = current.map(el => {
         if (el.id === this.resizingId) {
@@ -160,7 +166,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       });
       // We only emit locally rapidly to not saturate, saveSubject handles DB
       this.canvasService.elements.set(updated);
-      this.cursorSubject.next({ x: e.clientX - this.panX, y: e.clientY - this.panY }); // prevent stutter
+      this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom }); // prevent stutter
       return;
     }
 
@@ -168,7 +174,11 @@ export class BoardComponent implements OnInit, OnDestroy {
       const current = this.canvasService.elements();
       const updated = current.map(el => {
         if (el.id === this.draggingId) {
-          return { ...el, x: e.clientX - this.dragOffsetX, y: e.clientY - this.dragOffsetY };
+          return { 
+             ...el, 
+             x: ((e.clientX - this.panX) / this.zoom) - this.dragOffsetX, 
+             y: ((e.clientY - this.panY) / this.zoom) - this.dragOffsetY 
+          };
         }
         return el;
       });
@@ -205,8 +215,8 @@ export class BoardComponent implements OnInit, OnDestroy {
       id: Math.random().toString(36).substr(2, 9),
       type: 'note',
       content: 'Ingresa texto estratégico...',
-      x: window.innerWidth / 2 - 125 - this.panX,
-      y: window.innerHeight / 2 - 80 - this.panY,
+      x: (window.innerWidth / 2 - this.panX) / this.zoom - 125,
+      y: (window.innerHeight / 2 - this.panY) / this.zoom - 80,
       color: '#121215',
       createdBy: user?.sub!
     };
@@ -223,8 +233,8 @@ export class BoardComponent implements OnInit, OnDestroy {
       type: 'shape',
       shapeType: shape,
       content: '',
-      x: window.innerWidth / 2 - 50 - this.panX,
-      y: window.innerHeight / 2 - 50 - this.panY,
+      x: (window.innerWidth / 2 - this.panX) / this.zoom - 50,
+      y: (window.innerHeight / 2 - this.panY) / this.zoom - 50,
       width: 100,
       height: 100,
       color: '#3B82F6', // Color default (ej. neonBlue-ish)
@@ -317,12 +327,10 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   startDrag(e: MouseEvent, note: BoardElement) {
     // Evitar arrastrar si da clic en la textarea (notas) o en la imagen directamente
-    const tag = (e.target as HTMLElement).tagName.toLowerCase();
-    if (tag === 'textarea' || tag === 'button') return;
-
+    if ((e.target as HTMLElement).tagName.toLowerCase() === 'textarea') return;
     this.draggingId = note.id;
-    this.dragOffsetX = e.clientX - note.x;
-    this.dragOffsetY = e.clientY - note.y;
+    this.dragOffsetX = ((e.clientX - this.panX) / this.zoom) - note.x;
+    this.dragOffsetY = ((e.clientY - this.panY) / this.zoom) - note.y;
   }
 
   updateContent(note: BoardElement, newContent: string) {
@@ -346,5 +354,52 @@ export class BoardComponent implements OnInit, OnDestroy {
   // Prevención de re-renderizado destructivo de Angular
   trackByNoteId(index: number, note: BoardElement) {
     return note.id;
+  }
+
+  // Zoom Implementación
+  @HostListener('wheel', ['$event'])
+  onWheel(e: WheelEvent) {
+    // Solo aplicar zoom si no estamos haciendo scroll dentro de una nota
+    if (e.target instanceof HTMLElement && e.target.tagName.toLowerCase() === 'textarea') {
+      return; 
+    }
+    
+    e.preventDefault(); 
+    
+    // Zoom in (acercar) o Zoom out (alejar)
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1; 
+    const newZoom = Math.min(Math.max(0.1, this.zoom * zoomFactor), 4);
+    
+    if (newZoom !== this.zoom) {
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      this.panX = mouseX - (mouseX - this.panX) * (newZoom / this.zoom);
+      this.panY = mouseY - (mouseY - this.panY) * (newZoom / this.zoom);
+      this.zoom = newZoom;
+
+      this.showZoomUi();
+      this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements()); 
+    }
+  }
+
+  showZoomUi() {
+    this.isZoomingUiVisible = true;
+    clearTimeout(this.zoomTimeout);
+    this.zoomTimeout = setTimeout(() => {
+      this.isZoomingUiVisible = false;
+    }, 1500);
+  }
+
+  changeZoom(delta: number) {
+     const newZoom = Math.min(Math.max(0.1, this.zoom + delta), 4);
+     const centerX = window.innerWidth / 2;
+     const centerY = window.innerHeight / 2;
+     
+     this.panX = centerX - (centerX - this.panX) * (newZoom / this.zoom);
+     this.panY = centerY - (centerY - this.panY) * (newZoom / this.zoom);
+     this.zoom = newZoom;
+     
+     this.showZoomUi();
   }
 }

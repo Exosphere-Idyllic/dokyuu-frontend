@@ -30,4 +30,8 @@ export class BoardsService {
   joinBoard(code: string) {
     return this.http.post<any>(`${environment.apiUrl}/members/join`, { code });
   }
+
+  updateBoard(id: string, name: string, description: string) {
+    return this.http.put<Board>(`${this.apiUrl}/${id}`, { name, description });
+  }
 }
