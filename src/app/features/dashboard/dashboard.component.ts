@@ -16,12 +16,26 @@ export class DashboardComponent implements OnInit {
   authService = inject(AuthService);
   router = inject(Router);
 
+  // ─── Board Signals ────────────────────────────────────────────────────────
   hostBoards = signal<Board[]>([]);
   guestBoards = signal<any[]>([]); 
 
   showCreateModal = signal(false);
   showJoinModal = signal(false);
   showEditModal = signal(false);
+
+  // ─── Profile Modal ────────────────────────────────────────────────────────
+  showProfileModal = signal(false);
+  profileName = '';
+  profileColor = '#00F0FF';
+  profileColorInput = '';
+  profileSaving = signal(false);
+
+  readonly PALETTE_COLORS = [
+    '#00F0FF', '#3B82F6', '#8B5CF6', '#EC4899',
+    '#EF4444', '#F97316', '#FBBF24', '#10B981',
+    '#14B8A6', '#06B6D4', '#6366F1', '#F43F5E',
+  ];
   
   newTitle = '';
   newDesc = '';
@@ -58,6 +72,39 @@ export class DashboardComponent implements OnInit {
   logout() {
     this.authService.logout();
     this.router.navigate(['/auth']);
+  }
+
+  openProfileModal() {
+    const user = this.authService.currentUser();
+    this.profileName = user?.displayName || user?.email?.split('@')[0] || '';
+    this.profileColor = user?.cursorColor || '#00F0FF';
+    this.profileColorInput = this.profileColor;
+    this.showProfileModal.set(true);
+  }
+
+  selectPaletteColor(color: string) {
+    this.profileColor = color;
+    this.profileColorInput = color;
+  }
+
+  onHexInput(value: string) {
+    this.profileColorInput = value;
+    // Validate hex/rgb format before applying
+    if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(value) || /^rgb/.test(value)) {
+      this.profileColor = value;
+    }
+  }
+
+  saveProfile() {
+    if (!this.profileName.trim()) return;
+    this.profileSaving.set(true);
+    this.authService.updateProfile(this.profileName.trim(), this.profileColor).subscribe({
+      next: () => {
+        this.showProfileModal.set(false);
+        this.profileSaving.set(false);
+      },
+      error: () => this.profileSaving.set(false)
+    });
   }
 
   createBoard() {

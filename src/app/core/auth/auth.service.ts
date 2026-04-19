@@ -3,7 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { tap } from 'rxjs';
 
-export interface UserState { token: string; email: string; sub: string; }
+export interface UserState { 
+  token: string; 
+  email: string; 
+  sub: string; 
+  displayName?: string; 
+  cursorColor?: string; 
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -21,6 +27,14 @@ export class AuthService {
 
   register(email: string, pass: string, name: string) {
     return this.http.post<any>(`${this.api}/register`, { email, password: pass, displayName: name }).pipe(
+      tap((res: any) => this.saveSession(res))
+    );
+  }
+
+  updateProfile(displayName: string, cursorColor: string) {
+    return this.http.put<any>(`${this.api}/profile`, 
+      { displayName, cursorColor }
+    ).pipe(
       tap((res: any) => this.saveSession(res))
     );
   }
@@ -44,10 +58,15 @@ export class AuthService {
     // CORRECCIÓN: El backend retorna user._id (no user.sub).
     // Normalizamos a sub para que el resto de la app use un campo consistente.
     const sub = res.user.sub || res.user._id;
-    const sessionData = { email: res.user.email, sub };
+    const sessionData = { 
+      email: res.user.email, 
+      sub, 
+      displayName: res.user.displayName, 
+      cursorColor: res.user.cursorColor 
+    };
 
     localStorage.setItem('dokyuu_token', res.access_token);
     localStorage.setItem('dokyuu_user', JSON.stringify(sessionData));
-    this.currentUser.set({ token: res.access_token, email: res.user.email, sub });
+    this.currentUser.set({ token: res.access_token, ...sessionData });
   }
 }

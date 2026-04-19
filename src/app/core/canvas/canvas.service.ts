@@ -21,6 +21,8 @@ export interface BoardElement {
 export interface CursorPosition {
   userId: string;
   email: string;
+  displayName?: string;
+  cursorColor?: string;
   position: { x: number; y: number };
 }
 
@@ -103,13 +105,15 @@ export class CanvasService {
     });
 
     // Manejar conexión de usuarios
-    this.socket.on('user:joined', (data: { userId: string; email: string }) => {
-      this.addNotification(`${data.email} se ha conectado`, 'success');
+    this.socket.on('user:joined', (data: { userId: string; email: string; displayName?: string; cursorColor?: string }) => {
+      const name = data.displayName || data.email.split('@')[0];
+      this.addNotification(`${name} se ha conectado`, 'success');
     });
 
     // Manejar desconexión de usuarios
-    this.socket.on('user:left', (data: { userId: string; email: string }) => {
-      this.addNotification(`${data.email} se ha desconectado`, 'warning');
+    this.socket.on('user:left', (data: { userId: string; email: string; displayName?: string }) => {
+      const name = data.displayName || data.email.split('@')[0];
+      this.addNotification(`${name} se ha desconectado`, 'warning');
       this.activeCursors.update(cursors => {
         const newCursors = { ...cursors };
         delete newCursors[data.userId];
