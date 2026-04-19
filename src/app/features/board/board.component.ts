@@ -1,16 +1,18 @@
 import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
+
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CanvasService, BoardElement } from '../../core/canvas/canvas.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { BoardsService } from '../../core/boards/boards.service';
+import { LoadingComponent } from '../loading/loading.component';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime } from 'rxjs';
 
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoadingComponent],
   templateUrl: './board.component.html',
 })
 export class BoardComponent implements OnInit, OnDestroy {
@@ -25,6 +27,10 @@ export class BoardComponent implements OnInit, OnDestroy {
   isUploadingImage = false;
   uploadError: string | null = null;
   hasRoleAccess = true;
+  isLoading = true;
+  showLoading = true; // controla el *ngIf del loading (se oculta después del fundido)
+
+  @ViewChild('loadingRef') loadingRef!: LoadingComponent;
   
   boardName: string = 'Cargando...';
   boardRole: string = 'Conectando...';
@@ -43,6 +49,9 @@ export class BoardComponent implements OnInit, OnDestroy {
   resizeStartW = 0;
   resizeStartH = 0;
   isRotatingId: string | null = null;
+
+  // --- Selección de Figuras ---
+  selectedShapeId: string | null = null;
 
   // --- Pan & Zoom / Infinite Canvas ---
   isPanning = false;
@@ -83,6 +92,13 @@ export class BoardComponent implements OnInit, OnDestroy {
     // Cargar datos estáticos iniciales desde la Base de Datos
     this.canvasService.loadElements(this.boardId).subscribe((elements: BoardElement[]) => {
       this.canvasService.elements.set(elements || []);
+      // Iniciar fundido suave en vez de corte abrupto
+      this.isLoading = false;
+      if (this.loadingRef) {
+        this.loadingRef.startFadeOut();
+      } else {
+        this.showLoading = false;
+      }
     });
 
     // Filtros de Tasa (FPS Control) para el Mouse Local -> WSS
@@ -112,6 +128,8 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
+      // Deseleccionar la figura activa al hacer clic en el fondo
+      this.selectedShapeId = null;
     }
   }
 
@@ -342,7 +360,44 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   deleteNote(id: string) {
+    if (this.selectedShapeId === id) this.selectedShapeId = null;
     const updated = this.canvasService.elements().filter(n => n.id !== id);
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  // Seleccionar una figura al hacer clic
+  selectShape(e: MouseEvent, note: BoardElement) {
+    e.stopPropagation();
+    this.selectedShapeId = note.id;
+  }
+
+  // Deformar (estirar) la figura cambiando la proporción ancho/alto
+  deformShape(id: string, axis: 'wider' | 'taller' | 'reset') {
+    const updated = this.canvasService.elements().map(el => {
+      if (el.id === id) {
+        const w = el.width || 100;
+        const h = el.height || 100;
+        switch (axis) {
+          case 'wider': return { ...el, width: w * 1.25, height: h * 0.9 };
+          case 'taller': return { ...el, width: w * 0.9, height: h * 1.25 };
+          case 'reset': return { ...el, width: 100, height: 100 };
+        }
+      }
+      return el;
+    });
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  // Rotar la figura 45° en sentido horario
+  rotateShape(id: string) {
+    const updated = this.canvasService.elements().map(el => {
+      if (el.id === id) {
+        return { ...el, rotation: ((el.rotation || 0) + 45) % 360 };
+      }
+      return el;
+    });
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
   }

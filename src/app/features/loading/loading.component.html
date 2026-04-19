@@ -1,0 +1,37 @@
+<div class="loading-screen" [class.fade-out]="isFadingOut">
+
+  <!-- ═══ Contenedor de la Animación SVG ═══ -->
+  <div class="animation-container">
+
+    <!-- Pizarra: Marco + Trazo Ondulado -->
+    <svg class="whiteboard" viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
+      <!-- Marco de la pizarra -->
+      <rect x="5" y="5" width="190" height="140" rx="10"
+            fill="#121215" stroke="#2a2a30" stroke-width="8"/>
+      <!-- Trazo ondulado que se dibuja -->
+      <path class="drawn-line"
+            d="M 30 50 Q 50 20 70 60 T 110 50 T 150 70"
+            fill="transparent"
+            stroke="#3B82F6"
+            stroke-width="4"
+            stroke-linecap="round"/>
+    </svg>
+
+    <!-- Lápiz animado que sigue la trayectoria del trazo -->
+    <svg class="pencil" viewBox="0 0 24 24" fill="none"
+         stroke="#f59e0b" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"
+         xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+    </svg>
+  </div>
+
+  <!-- ═══ Mensajes Rotativos + Puntos Suspensivos ═══ -->
+  <div class="message-container">
+    <p class="loading-message">{{ currentMessage() }}</p>
+    <div class="loading-dots">
+      <span>.</span><span>.</span><span>.</span>
+    </div>
+  </div>
+
+</div>

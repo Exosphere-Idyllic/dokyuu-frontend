@@ -1,4 +1,9 @@
+<!-- ═══ PANTALLA DE CARGA (con fundido de salida) ═══ -->
+<app-loading #loadingRef *ngIf="showLoading" (fadeOutDone)="showLoading = false"></app-loading>
+
 <div class="relative w-screen h-screen overflow-hidden bg-darkBg canvas-wrapper cursor-grab select-none" 
+     *ngIf="!isLoading"
+
      [class.cursor-grabbing]="isPanning"
      [style.background-position]="panX + 'px ' + panY + 'px'"
      style="background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px;"
@@ -184,16 +189,23 @@
       <!-- ─── ELEMENTO: FIGURA SVG ──────────────────────────────────── -->
       <div *ngIf="note.type === 'shape'"
            class="absolute cursor-move select-none group group-shape"
+           [class.ring-2]="selectedShapeId === note.id"
+           [class.ring-neonBlue]="selectedShapeId === note.id"
+           [class.ring-offset-2]="selectedShapeId === note.id"
+           [class.ring-offset-transparent]="selectedShapeId === note.id"
            [style.left.px]="note.x"
            [style.top.px]="note.y"
            [style.transform]="'rotate(' + (note.rotation || 0) + 'deg)'"
            [style.width.px]="note.width"
            [style.height.px]="note.height"
            style="transform-origin: center center;"
-           (mousedown)="startDrag($event, note)">
+           (mousedown)="startDrag($event, note)"
+           (click)="selectShape($event, note)">
            
-         <!-- Rotate Handle -->
-         <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/10 hover:bg-white/30 border border-white/20 hover:border-white/50 rounded-full cursor-grab opacity-0 group-[.group-shape]:hover:opacity-100 transition-all pointer-events-auto flex items-center justify-center p-0.5"
+         <!-- Rotate Handle (visible en hover o cuando está seleccionado) -->
+         <div class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/10 hover:bg-white/30 border border-white/20 hover:border-white/50 rounded-full cursor-grab transition-all pointer-events-auto flex items-center justify-center p-0.5"
+              [class.opacity-0]="selectedShapeId !== note.id"
+              [class.opacity-100]="selectedShapeId === note.id"
               (mousedown)="startRotate($event, note)">
               <div class="w-1.5 h-1.5 rounded-full bg-white/70"></div>
          </div>
@@ -218,26 +230,75 @@
             <line x1="4" [attr.y1]="((note.height || 20) / 2)" [attr.x2]="(note.width || 100) - 8" [attr.y2]="((note.height || 20) / 2)" [attr.stroke]="note.color" stroke-width="4" stroke-linecap="round" [attr.marker-end]="'url(#arrowhead-' + note.id + ')'" />
          </svg>
 
-         <!-- Toolbar Flotante de Acciones (Solo Hover) -->
-         <div class="absolute -top-16 left-1/2 -translate-x-1/2 bg-black/80 rounded flex items-center gap-1.5 p-1.5 opacity-0 group-[.group-shape]:hover:opacity-100 transition-opacity pointer-events-auto border border-white/10 whitespace-nowrap shadow-lg">
-            
-            <!-- Selector HEX nativo integrado en una rueda de color -->
-            <label class="w-5 h-5 rounded-full overflow-hidden cursor-pointer flex items-center justify-center hover:scale-110 transition-transform shadow-sm ring-1 ring-white/30 relative" title="Código HEX Personalizado" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
-               <span class="text-black text-[13px] drop-shadow-md font-black leading-none">+</span>
+         <!-- ═══ TOOLBAR PERSISTENTE: Aparece al hacer CLICK sobre la figura ═══ -->
+         <div *ngIf="selectedShapeId === note.id"
+              class="absolute -top-[68px] left-1/2 -translate-x-1/2 bg-[#0d0d10]/95 backdrop-blur-sm rounded-lg flex items-center gap-1 p-1.5 pointer-events-auto border border-white/15 whitespace-nowrap shadow-2xl z-50"
+              (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+
+            <!-- ✕ BORRAR -->
+            <button (click)="deleteNote(note.id)" title="Eliminar figura"
+                    class="w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-colors cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+
+            <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+
+            <!-- 🎨 COLOR: Selector HEX + Presets rápidos -->
+            <label class="w-6 h-6 rounded-full overflow-hidden cursor-pointer flex items-center justify-center hover:scale-110 transition-transform shadow-sm ring-1 ring-white/30 relative" title="Color personalizado (HEX)" style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+               <span class="text-black text-[11px] drop-shadow-md font-black leading-none">+</span>
                <input type="color" [value]="note.color" (change)="changeColor(note.id, $any($event.target).value)" (mousedown)="$event.stopPropagation()" class="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
             </label>
-            
-            <div class="w-px h-4 bg-white/20 mx-1"></div>
-            <button (mousedown)="changeColor(note.id, '#EF4444'); $event.stopPropagation()" class="w-4 h-4 rounded-full bg-red-500 hover:scale-110 transition-transform shadow-sm"></button>
-            <button (mousedown)="changeColor(note.id, '#3B82F6'); $event.stopPropagation()" class="w-4 h-4 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm"></button>
-            <button (mousedown)="changeColor(note.id, '#10B981'); $event.stopPropagation()" class="w-4 h-4 rounded-full bg-emerald-500 hover:scale-110 transition-transform shadow-sm"></button>
-            
-            <div class="w-px h-4 bg-white/20 mx-1"></div>
-            <button (mousedown)="deleteNote(note.id); $event.stopPropagation()" class="w-5 h-5 flex items-center justify-center text-red-500 hover:bg-white/10 rounded font-black text-xs">×</button>
+            <button (click)="changeColor(note.id, '#EF4444')" title="Rojo" class="w-5 h-5 rounded-full bg-red-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+            <button (click)="changeColor(note.id, '#3B82F6')" title="Azul" class="w-5 h-5 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+            <button (click)="changeColor(note.id, '#10B981')" title="Verde" class="w-5 h-5 rounded-full bg-emerald-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+            <button (click)="changeColor(note.id, '#F59E0B')" title="Ámbar" class="w-5 h-5 rounded-full bg-amber-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+            <button (click)="changeColor(note.id, '#8B5CF6')" title="Violeta" class="w-5 h-5 rounded-full bg-violet-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+
+            <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+
+            <!-- 🔄 ROTAR (click = +45°) -->
+            <button (click)="rotateShape(note.id)" title="Rotar 45°"
+                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+
+            <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+
+            <!-- 🔀 DEFORMAR -->
+            <button (click)="deformShape(note.id, 'wider')" title="Más ancho"
+                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="17 8 21 12 17 16"></polyline>
+                <polyline points="7 8 3 12 7 16"></polyline>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+              </svg>
+            </button>
+            <button (click)="deformShape(note.id, 'taller')" title="Más alto"
+                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="8 7 12 3 16 7"></polyline>
+                <polyline points="8 17 12 21 16 17"></polyline>
+                <line x1="12" y1="3" x2="12" y2="21"></line>
+              </svg>
+            </button>
+            <button (click)="deformShape(note.id, 'reset')" title="Restablecer proporciones"
+                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer text-[10px] font-bold">
+              1:1
+            </button>
          </div>
 
-         <!-- Resize Handle Inferior Derecho (Invisible pero funcional con hover local) -->
-         <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-transparent cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto border-b-2 border-r-2 border-white/50"
+         <!-- Resize Handle Inferior Derecho (visible en hover o seleccionado) -->
+         <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-transparent cursor-nwse-resize transition-opacity pointer-events-auto border-b-2 border-r-2 border-white/50"
+              [class.opacity-0]="selectedShapeId !== note.id"
+              [class.opacity-100]="selectedShapeId === note.id"
               (mousedown)="startResize($event, note)">
          </div>
       </div>
