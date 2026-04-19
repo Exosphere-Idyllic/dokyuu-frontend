@@ -32,6 +32,12 @@ export interface CloudinaryUploadResult {
   height: number;
 }
 
+export interface ToastNotification {
+  id: number;
+  message: string;
+  type: 'info' | 'success' | 'warning';
+}
+
 @Injectable({ providedIn: 'root' })
 export class CanvasService {
   private http = inject(HttpClient);
@@ -39,6 +45,15 @@ export class CanvasService {
   
   public elements = signal<BoardElement[]>([]);
   public activeCursors = signal<Record<string, CursorPosition>>({});
+  public notifications = signal<ToastNotification[]>([]);
+
+  public addNotification(message: string, type: 'info' | 'success' | 'warning' = 'info') {
+    const id = Date.now();
+    this.notifications.update(n => [...n, { id, message, type }]);
+    setTimeout(() => {
+      this.notifications.update(n => n.filter(notif => notif.id !== id));
+    }, 3500);
+  }
 
   connect(boardId: string, token: string) {
     // Si ya hay un socket activo, desconectarlo limpiamente antes de crear uno nuevo.
@@ -85,6 +100,21 @@ export class CanvasService {
     // Recibir posiciones de cursores de otros usuarios
     this.socket.on('cursor:move', (data: CursorPosition) => {
       this.activeCursors.update(cursors => ({ ...cursors, [data.userId]: data }));
+    });
+
+    // Manejar conexión de usuarios
+    this.socket.on('user:joined', (data: { userId: string; email: string }) => {
+      this.addNotification(`${data.email} se ha conectado`, 'success');
+    });
+
+    // Manejar desconexión de usuarios
+    this.socket.on('user:left', (data: { userId: string; email: string }) => {
+      this.addNotification(`${data.email} se ha desconectado`, 'warning');
+      this.activeCursors.update(cursors => {
+        const newCursors = { ...cursors };
+        delete newCursors[data.userId];
+        return newCursors;
+      });
     });
   }
 

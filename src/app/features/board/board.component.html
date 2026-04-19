@@ -277,4 +277,17 @@
     
     <button (click)="changeZoom(-0.1)" class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/20 hover:scale-110 text-white flex items-center justify-center font-bold transition-all text-2xl shadow-inner pb-1">-</button>
   </div>
+
+  <!-- Notificaciones Toast (Conexiones / Desconexiones) -->
+  <div class="fixed bottom-4 left-4 z-[70] flex flex-col gap-2 pointer-events-none">
+    <div *ngFor="let notif of canvasService.notifications()" 
+         class="px-4 py-2 text-xs font-bold tracking-widest uppercase border pointer-events-auto transition-all duration-300"
+         [ngClass]="{
+           'bg-emerald-500/20 text-emerald-400 border-emerald-500/30': notif.type === 'success',
+           'bg-amber-500/20 text-amber-400 border-amber-500/30': notif.type === 'warning',
+           'bg-neonBlue/20 text-neonBlue border-neonBlue/30': notif.type === 'info'
+         }">
+      {{ notif.message }}
+    </div>
+  </div>
 </div>
