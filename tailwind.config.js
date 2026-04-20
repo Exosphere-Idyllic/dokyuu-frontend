@@ -6,16 +6,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        darkBg: '#0A0A0C',
-        darkSurface: '#121215',
-        neonBlue: '#3B82F6',
-        neonBlueHover: '#2563EB',
+        // Apuntan a las variables CSS — cambian automáticamente con data-theme
+        darkBg: 'var(--color-bg)',
+        darkSurface: 'var(--color-surface)',
+        neonBlue: 'var(--color-accent)',
+        neonBlueHover: 'var(--color-accent-hover)',
+        textPrimary: 'var(--color-text)',
+        textMuted: 'var(--color-text-muted)',
       },
-      fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-      }
     },
   },
   plugins: [],
-}
-
+};

@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { BoardsService, Board } from '../../core/boards/boards.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { ThemeService, THEMES, Theme, ThemeId } from '../../core/theme/theme.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -14,11 +15,15 @@ import { AuthService } from '../../core/auth/auth.service';
 export class DashboardComponent implements OnInit {
   boardsService = inject(BoardsService);
   authService = inject(AuthService);
+  themeService = inject(ThemeService);
   router = inject(Router);
+
+  // ─── Navegación del sidebar ───────────────────────────────────────────────
+  activeSidebarTab = signal<'boards' | 'settings'>('boards');
 
   // ─── Board Signals ────────────────────────────────────────────────────────
   hostBoards = signal<Board[]>([]);
-  guestBoards = signal<any[]>([]); 
+  guestBoards = signal<any[]>([]);
 
   showCreateModal = signal(false);
   showJoinModal = signal(false);
@@ -36,7 +41,10 @@ export class DashboardComponent implements OnInit {
     '#EF4444', '#F97316', '#FBBF24', '#10B981',
     '#14B8A6', '#06B6D4', '#6366F1', '#F43F5E',
   ];
-  
+
+  // ─── Theme ────────────────────────────────────────────────────────────────
+  readonly themes: Theme[] = THEMES;
+
   newTitle = '';
   newDesc = '';
   joinCode = '';
@@ -44,25 +52,35 @@ export class DashboardComponent implements OnInit {
   editBoardId = '';
   editTitle = '';
   editDesc = '';
-  
+
   loading = signal(false);
 
   ngOnInit() {
     this.fetchBoards();
   }
 
+  // ─── Sidebar nav ──────────────────────────────────────────────────────────
+  setTab(tab: 'boards' | 'settings') {
+    this.activeSidebarTab.set(tab);
+  }
+
+  // ─── Themes ───────────────────────────────────────────────────────────────
+  selectTheme(id: ThemeId) {
+    this.themeService.setTheme(id);
+  }
+
+  isActiveTheme(id: ThemeId): boolean {
+    return this.themeService.currentTheme() === id;
+  }
+
+  // ─── Boards ───────────────────────────────────────────────────────────────
   fetchBoards() {
     this.boardsService.getBoards().subscribe({
       next: (boards: any[]) => {
         const hosts = boards.filter(b => b.myRole === 'host');
-        // CORRECCIÓN: estructura plana y explícita en vez de anidar en boardId
-        const guests = boards.filter(b => b.myRole !== 'host').map(b => ({
-          _id: b._id,
-          name: b.name,
-          description: b.description,
-          role: b.myRole
-        }));
-        
+        const guests = boards
+          .filter(b => b.myRole !== 'host')
+          .map(b => ({ _id: b._id, name: b.name, description: b.description, role: b.myRole }));
         this.hostBoards.set(hosts);
         this.guestBoards.set(guests);
       }
@@ -89,7 +107,6 @@ export class DashboardComponent implements OnInit {
 
   onHexInput(value: string) {
     this.profileColorInput = value;
-    // Validate hex/rgb format before applying
     if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(value) || /^rgb/.test(value)) {
       this.profileColor = value;
     }
@@ -99,10 +116,7 @@ export class DashboardComponent implements OnInit {
     if (!this.profileName.trim()) return;
     this.profileSaving.set(true);
     this.authService.updateProfile(this.profileName.trim(), this.profileColor).subscribe({
-      next: () => {
-        this.showProfileModal.set(false);
-        this.profileSaving.set(false);
-      },
+      next: () => { this.showProfileModal.set(false); this.profileSaving.set(false); },
       error: () => this.profileSaving.set(false)
     });
   }
@@ -118,7 +132,7 @@ export class DashboardComponent implements OnInit {
         this.newDesc = '';
         this.loading.set(false);
       },
-      error: () => this.loading.set(false) 
+      error: () => this.loading.set(false)
     });
   }
 
@@ -130,7 +144,7 @@ export class DashboardComponent implements OnInit {
         this.showJoinModal.set(false);
         this.joinCode = '';
         this.loading.set(false);
-        this.fetchBoards(); 
+        this.fetchBoards();
       },
       error: (e: any) => {
         alert(e.error?.message || 'Código inválido');
@@ -151,31 +165,17 @@ export class DashboardComponent implements OnInit {
     if (!this.editTitle) return;
     this.loading.set(true);
     this.boardsService.updateBoard(this.editBoardId, this.editTitle, this.editDesc).subscribe({
-      next: () => {
-        this.showEditModal.set(false);
-        this.loading.set(false);
-        this.fetchBoards();
-      },
-      error: () => this.loading.set(false) 
+      next: () => { this.showEditModal.set(false); this.loading.set(false); this.fetchBoards(); },
+      error: () => this.loading.set(false)
     });
   }
 
   deleteBoard() {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta pizarra? Esta acción no se puede deshacer.')) {
-      return;
-    }
-    
+    if (!confirm('¿Estás seguro de que deseas eliminar esta pizarra? Esta acción no se puede deshacer.')) return;
     this.loading.set(true);
     this.boardsService.deleteBoard(this.editBoardId).subscribe({
-      next: () => {
-        this.showEditModal.set(false);
-        this.loading.set(false);
-        this.fetchBoards();
-      },
-      error: () => {
-        this.loading.set(false);
-        alert('Error al eliminar la pizarra');
-      }
+      next: () => { this.showEditModal.set(false); this.loading.set(false); this.fetchBoards(); },
+      error: () => { this.loading.set(false); alert('Error al eliminar la pizarra'); }
     });
   }
 

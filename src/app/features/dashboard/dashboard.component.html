@@ -1,67 +1,97 @@
-<div class="flex h-screen w-full bg-darkBg text-white overflow-hidden font-sans">
-  
-  <!-- Sidebar Elegante -->
-  <aside class="w-64 bg-darkSurface border-r border-white/5 flex flex-col justify-between py-8 px-6">
+<div class="flex h-screen w-full overflow-hidden font-sans"
+  style="background-color: var(--color-bg); color: var(--color-text)">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="w-64 flex flex-col justify-between py-8 px-6 flex-shrink-0"
+    style="background-color: var(--color-surface); border-right: 1px solid var(--color-border)">
     <div>
-      <h2 class="text-2xl font-bold tracking-tight text-white mb-2">Dokyuu</h2>
-      <p class="text-xs text-neonBlue font-semibold uppercase tracking-widest mb-10">Lobby Global</p>
-      
-      <nav class="flex flex-col gap-2">
-        <button class="text-left w-full px-4 py-3 bg-neonBlue/10 text-neonBlue border-l-2 border-neonBlue text-sm font-medium transition-all">
+      <h2 class="text-2xl font-bold tracking-tight mb-1" style="color: var(--color-text)">Dokyuu</h2>
+      <p class="text-xs font-semibold uppercase tracking-widest mb-10" style="color: var(--color-accent)">Lobby Global
+      </p>
+
+      <nav class="flex flex-col gap-1">
+        <!-- Pizarras -->
+        <button (click)="setTab('boards')" class="text-left w-full px-4 py-3 text-sm font-medium transition-all"
+          [style.background-color]="activeSidebarTab() === 'boards' ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent'"
+          [style.color]="activeSidebarTab() === 'boards' ? 'var(--color-accent)' : 'var(--color-text-muted)'"
+          [style.border-left]="activeSidebarTab() === 'boards' ? '2px solid var(--color-accent)' : '2px solid transparent'">
           Pizarras Desplegadas
+        </button>
+
+        <!-- Configuración -->
+        <button (click)="setTab('settings')"
+          class="text-left w-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-between"
+          [style.background-color]="activeSidebarTab() === 'settings' ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent'"
+          [style.color]="activeSidebarTab() === 'settings' ? 'var(--color-accent)' : 'var(--color-text-muted)'"
+          [style.border-left]="activeSidebarTab() === 'settings' ? '2px solid var(--color-accent)' : '2px solid transparent'">
+          Configuración
+          <svg class="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+          </svg>
         </button>
       </nav>
     </div>
 
     <!-- User & Logout -->
-    <div class="border-t border-white/10 pt-6">
-      <!-- Avatar + Name Row -->
+    <div style="border-top: 1px solid var(--color-border)" class="pt-6">
       <div class="flex items-center gap-3 mb-4">
-        <!-- Color avatar circle -->
-        <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white shadow-lg"
-             [style.background-color]="authService.currentUser()?.cursorColor || '#00F0FF'"
-             [style.box-shadow]="'0 0 10px ' + (authService.currentUser()?.cursorColor || '#00F0FF') + '60'">
-          {{ (authService.currentUser()?.displayName || authService.currentUser()?.email || '?').charAt(0).toUpperCase() }}
+        <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center text-xs font-black shadow-lg"
+          [style.background-color]="authService.currentUser()?.cursorColor || 'var(--color-accent)'"
+          style="color: #0A0A0C">
+          {{ (authService.currentUser()?.displayName || authService.currentUser()?.email || '?').charAt(0).toUpperCase()
+          }}
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-semibold text-white truncate">
+          <div class="text-sm font-semibold truncate" style="color: var(--color-text)">
             {{ authService.currentUser()?.displayName || (authService.currentUser()?.email?.split('@')?.[0] ?? '') }}
           </div>
-          <div class="text-[10px] text-gray-500 truncate" [title]="authService.currentUser()?.email || ''">
+          <div class="text-[10px] truncate" style="color: var(--color-text-muted)">
             {{ authService.currentUser()?.email }}
           </div>
         </div>
       </div>
 
-      <!-- Profile Button -->
       <button (click)="openProfileModal()"
-              class="w-full mb-2 text-left text-xs bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 border border-white/10 px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between">
+        class="w-full mb-2 text-left text-xs px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between"
+        style="background-color: var(--color-border); color: var(--color-text-muted); border: 1px solid var(--color-border)">
         Perfil de Usuario
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+        </svg>
       </button>
 
-      <!-- Logout -->
-      <button (click)="logout()" class="w-full mt-1 text-left text-xs bg-red-900/20 text-red-400 hover:text-red-300 border border-red-500/20 px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between">
+      <button (click)="logout()"
+        class="w-full text-left text-xs px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between"
+        style="background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.2)">
         Cerrar Sesión <span>✕</span>
       </button>
     </div>
   </aside>
 
-  <!-- Main Content -->
-  <main class="flex-1 overflow-y-auto p-10 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-    <div class="absolute -top-40 -right-40 w-96 h-96 bg-neonBlue/5 blur-3xl z-0 pointer-events-none"></div>
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main
+    class="flex-1 overflow-y-auto p-10 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    <div class="absolute -top-40 -right-40 w-96 h-96 blur-3xl z-0 pointer-events-none"
+      style="background-color: color-mix(in srgb, var(--color-accent) 5%, transparent)"></div>
 
-    <div class="max-w-6xl mx-auto z-10 relative">
+    <!-- ── PIZARRAS ── -->
+    <div *ngIf="activeSidebarTab() === 'boards'" class="max-w-6xl mx-auto z-10 relative">
       <div class="flex items-end justify-between mb-12">
         <div>
-          <h1 class="text-3xl font-semibold mb-2">Selección de Proyecto</h1>
-          <p class="text-gray-400">Escoge una infraestructura base o únete a un despliegue externo mediante un código.</p>
+          <h1 class="text-3xl font-semibold mb-2" style="color: var(--color-text)">Selección de Proyecto</h1>
+          <p style="color: var(--color-text-muted)">Escoge una infraestructura base o únete mediante un código.</p>
         </div>
         <div class="flex gap-4">
-          <button (click)="showJoinModal.set(true)" class="border border-white/10 bg-darkSurface hover:bg-white/5 text-white py-2 px-6 text-sm font-semibold transition-colors duration-200">
+          <button (click)="showJoinModal.set(true)" class="py-2 px-6 text-sm font-semibold transition-colors"
+            style="border: 1px solid var(--color-border); background-color: var(--color-surface); color: var(--color-text)">
             Ingresar Código
           </button>
-          <button (click)="showCreateModal.set(true)" class="btn-primary py-2 px-6">
+          <button (click)="showCreateModal.set(true)" class="btn-primary py-2 px-6 text-sm">
             Desplegar Pizarra
           </button>
         </div>
@@ -69,27 +99,40 @@
 
       <!-- Host Boards -->
       <section class="mb-12">
-        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-6 border-b border-white/5 pb-2">Tus Pizarras Propias (Host)</h3>
-        
-        <div *ngIf="hostBoards().length === 0" class="glass p-8 text-center border-dashed border-white/20">
-          <p class="text-gray-400 text-sm">No tienes administraciones activas en este nodo.</p>
+        <h3 class="text-sm font-bold uppercase tracking-widest mb-6 pb-2"
+          style="color: var(--color-text-muted); border-bottom: 1px solid var(--color-border)">
+          Tus Pizarras Propias (Host)
+        </h3>
+
+        <div *ngIf="hostBoards().length === 0" class="p-8 text-center" style="border: 1px dashed var(--color-border)">
+          <p class="text-sm" style="color: var(--color-text-muted)">No tienes administraciones activas en este nodo.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <article *ngFor="let board of hostBoards()" 
-                   (click)="openBoard(board._id)"
-                   class="glass p-6 hover:border-neonBlue/50 cursor-pointer transition-colors group relative overflow-hidden">
-            <button (click)="openEditModal($event, board)" class="absolute top-2 left-2 p-1 text-gray-400 hover:text-white transition-colors z-10" title="Editar Pizarra">
+          <article *ngFor="let board of hostBoards()" (click)="openBoard(board._id)"
+            class="p-6 cursor-pointer transition-colors group relative overflow-hidden glass hover:border-[var(--color-accent)]">
+            <button (click)="openEditModal($event, board)" class="absolute top-2 left-2 p-1 transition-colors z-10"
+              style="color: var(--color-text-muted)" title="Editar">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                <path
+                  d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
               </svg>
             </button>
-            <div class="absolute top-0 right-0 p-2 opacity-50 text-[10px] uppercase bg-neonBlue/20 text-neonBlue tracking-wider font-bold">Propietario</div>
-            <h4 class="text-lg font-semibold mb-2 mt-4 ml-2 group-hover:text-neonBlue transition-colors">{{ board.name }}</h4>
-            <p class="text-sm text-gray-400 mb-6 line-clamp-2 h-10">{{ board.description || 'Sin resumen provisto.' }}</p>
-            <div class="flex justify-between items-center text-[11px] text-gray-500 border-t border-white/5 pt-4">
-              <span class="uppercase tracking-widest text-gray-600">Member: <b class="text-gray-300 tracking-normal">{{board.memberCode}}</b></span>
-              <span class="uppercase tracking-widest text-gray-600">Reader: <b class="text-gray-300 tracking-normal">{{board.readerCode}}</b></span>
+            <div class="absolute top-0 right-0 p-2 text-[10px] uppercase tracking-wider font-bold"
+              style="background-color: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent)">
+              Propietario
+            </div>
+            <h4 class="text-lg font-semibold mb-2 mt-4 ml-2 transition-colors group-hover:text-[var(--color-accent)]"
+              style="color: var(--color-text)">{{ board.name }}</h4>
+            <p class="text-sm mb-6 line-clamp-2 h-10" style="color: var(--color-text-muted)">
+              {{ board.description || 'Sin resumen provisto.' }}
+            </p>
+            <div class="flex justify-between items-center text-[11px] pt-4"
+              style="border-top: 1px solid var(--color-border); color: var(--color-text-muted)">
+              <span class="uppercase tracking-widest">Member: <b
+                  style="color: var(--color-text)">{{board.memberCode}}</b></span>
+              <span class="uppercase tracking-widest">Reader: <b
+                  style="color: var(--color-text)">{{board.readerCode}}</b></span>
             </div>
           </article>
         </div>
@@ -97,194 +140,238 @@
 
       <!-- Guest Boards -->
       <section>
-        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-6 border-b border-white/5 pb-2">Despliegues Externos (Accesos)</h3>
-        
-        <div *ngIf="guestBoards().length === 0" class="glass p-8 text-center border-dashed border-white/20">
-          <p class="text-gray-400 text-sm">No estás vinculado como invitado a ninguna infraestructura remota.</p>
+        <h3 class="text-sm font-bold uppercase tracking-widest mb-6 pb-2"
+          style="color: var(--color-text-muted); border-bottom: 1px solid var(--color-border)">
+          Despliegues Externos (Accesos)
+        </h3>
+
+        <div *ngIf="guestBoards().length === 0" class="p-8 text-center" style="border: 1px dashed var(--color-border)">
+          <p class="text-sm" style="color: var(--color-text-muted)">No estás vinculado como invitado a ninguna
+            infraestructura.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <article *ngFor="let invite of guestBoards()" 
-                   (click)="openBoard(invite._id)"
-                   class="glass p-6 hover:border-white/20 cursor-pointer transition-colors group relative">
-            <div class="absolute top-0 right-0 p-2 opacity-60 text-[10px] font-bold uppercase tracking-wider"
-                 [ngClass]="invite.role === 'reader' ? 'bg-orange-500/20 text-orange-400' : 'bg-white/10 text-white'">
+          <article *ngFor="let invite of guestBoards()" (click)="openBoard(invite._id)"
+            class="glass p-6 cursor-pointer transition-colors group relative">
+            <div class="absolute top-0 right-0 p-2 text-[10px] font-bold uppercase tracking-wider"
+              [style.background-color]="invite.role === 'reader' ? 'rgba(249,115,22,0.15)' : 'var(--color-border)'"
+              [style.color]="invite.role === 'reader' ? '#F97316' : 'var(--color-text-muted)'">
               Rol: {{ invite.role }}
             </div>
-            <h4 class="text-lg font-semibold mb-2 mt-4 group-hover:text-white text-gray-200 transition-colors">{{ invite.name }}</h4>
-            <p class="text-sm text-gray-400 line-clamp-2 h-10">{{ invite.description || 'Sin resumen provisto.' }}</p>
+            <h4 class="text-lg font-semibold mb-2 mt-4 transition-colors" style="color: var(--color-text)">{{
+              invite.name }}</h4>
+            <p class="text-sm line-clamp-2 h-10" style="color: var(--color-text-muted)">{{ invite.description || 'Sin
+              resumen provisto.' }}</p>
           </article>
         </div>
       </section>
+    </div>
 
+    <!-- ── CONFIGURACIÓN ── -->
+    <div *ngIf="activeSidebarTab() === 'settings'" class="max-w-2xl mx-auto z-10 relative">
+      <div class="mb-10">
+        <p class="text-xs uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Apariencia</p>
+        <h1 class="text-3xl font-semibold" style="color: var(--color-text)">Tema de la interfaz</h1>
+        <p class="mt-2 text-sm" style="color: var(--color-text-muted)">
+          El tema se aplica globalmente y se guarda de forma automática.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <button *ngFor="let theme of themes" (click)="selectTheme(theme.id)"
+          class="relative text-left p-4 transition-all duration-200 group"
+          [style.border]="isActiveTheme(theme.id) ? '2px solid var(--color-accent)' : '1px solid var(--color-border)'"
+          [style.background-color]="isActiveTheme(theme.id) ? 'color-mix(in srgb, var(--color-accent) 6%, var(--color-surface))' : 'var(--color-surface)'">
+
+          <!-- Badge activo -->
+          <div *ngIf="isActiveTheme(theme.id)"
+            class="absolute top-2 right-2 text-[9px] uppercase tracking-widest font-bold px-2 py-0.5"
+            style="background-color: color-mix(in srgb, var(--color-accent) 20%, transparent); color: var(--color-accent)">
+            Activo
+          </div>
+
+          <!-- Preview mini del tema -->
+          <div class="flex gap-2 mb-3 h-16 overflow-hidden"
+            [style.border]="'1px solid ' + theme.colors.preview[2] + '30'">
+            <!-- Sidebar simulado -->
+            <div class="w-8 h-full flex-shrink-0 flex flex-col gap-1 p-1"
+              [style.background-color]="theme.colors.surface">
+              <div class="h-1.5 w-full" [style.background-color]="theme.colors.accent"></div>
+              <div class="h-1 w-3/4 mt-1" [style.background-color]="theme.colors.accent + '40'"></div>
+              <div class="h-1 w-full mt-0.5" [style.background-color]="theme.colors.accent + '20'"></div>
+              <div class="h-1 w-full mt-0.5" [style.background-color]="theme.colors.accent + '20'"></div>
+            </div>
+            <!-- Contenido simulado -->
+            <div class="flex-1 h-full p-1.5" [style.background-color]="theme.colors.bg">
+              <div class="h-1.5 w-1/2 mb-1.5" [style.background-color]="theme.colors.accent + '60'"></div>
+              <div class="grid grid-cols-2 gap-1">
+                <div class="h-6" [style.background-color]="theme.colors.surface + 'cc'"></div>
+                <div class="h-6" [style.background-color]="theme.colors.surface + 'cc'"></div>
+                <div class="h-6" [style.background-color]="theme.colors.surface + 'cc'"></div>
+                <div class="h-6" [style.background-color]="theme.colors.surface + 'cc'"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chips de color -->
+          <div class="flex items-center gap-1.5 mb-3">
+            <div class="w-5 h-5" [style.background-color]="theme.colors.bg"></div>
+            <div class="w-5 h-5" [style.background-color]="theme.colors.surface"></div>
+            <div class="w-5 h-5" [style.background-color]="theme.colors.accent"></div>
+          </div>
+
+          <!-- Nombre y descripción -->
+          <p class="text-sm font-semibold" style="color: var(--color-text)">{{ theme.name }}</p>
+          <p class="text-[11px] mt-0.5" style="color: var(--color-text-muted)">{{ theme.description }}</p>
+        </button>
+      </div>
     </div>
   </main>
 </div>
 
-<!-- Modal Create -->
-<div *ngIf="showCreateModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-lg">
-    <h3 class="text-xl font-bold mb-6">Desplegar Nueva Infraestructura</h3>
+<!-- ══ Modal Create ══ -->
+<div *ngIf="showCreateModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  style="background: rgba(0,0,0,0.80); backdrop-filter: blur(4px)">
+  <div class="p-8 w-full max-w-lg" style="background-color: var(--color-bg); border: 1px solid var(--color-border)">
+    <h3 class="text-xl font-bold mb-6" style="color: var(--color-text)">Desplegar Nueva Infraestructura</h3>
     <div class="flex flex-col gap-4">
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Nombre del Proyecto</label>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+          style="color: var(--color-text-muted)">Nombre del Proyecto</label>
         <input type="text" [(ngModel)]="newTitle" class="input-primary w-full" placeholder="Ej. Arquitectura V2">
       </div>
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Resumen (Opcional)</label>
-        <textarea [(ngModel)]="newDesc" class="input-primary w-full h-24 resize-none" placeholder="Contexto de esta pizarra..."></textarea>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+          style="color: var(--color-text-muted)">Resumen (Opcional)</label>
+        <textarea [(ngModel)]="newDesc" class="input-primary w-full h-24 resize-none"
+          placeholder="Contexto de esta pizarra..."></textarea>
       </div>
     </div>
-    <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/5">
-      <button (click)="showCreateModal.set(false)" class="px-6 py-2 text-sm text-gray-400 hover:text-white transition-colors">Abortar</button>
-      <button (click)="createBoard()" [disabled]="!newTitle || loading()" class="btn-primary disabled:opacity-50 text-sm">Ejecutar Construcción</button>
+    <div class="flex justify-end gap-3 mt-8 pt-6" style="border-top: 1px solid var(--color-border)">
+      <button (click)="showCreateModal.set(false)" class="px-6 py-2 text-sm transition-colors"
+        style="color: var(--color-text-muted)">Abortar</button>
+      <button (click)="createBoard()" [disabled]="!newTitle || loading()"
+        class="btn-primary disabled:opacity-50 text-sm">Ejecutar</button>
     </div>
   </div>
 </div>
 
-<!-- Modal Join -->
-<div *ngIf="showJoinModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-sm">
-    <h3 class="text-xl font-bold mb-6">Vincularse con Tokens</h3>
-    <div class="flex flex-col gap-4">
-      <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Token Hash (Reader / Member)</label>
-        <input type="text" [(ngModel)]="joinCode" class="input-primary w-full tracking-widest text-center text-lg uppercase" placeholder="K3P-X9P">
-      </div>
+<!-- ══ Modal Join ══ -->
+<div *ngIf="showJoinModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  style="background: rgba(0,0,0,0.80); backdrop-filter: blur(4px)">
+  <div class="p-8 w-full max-w-sm" style="background-color: var(--color-bg); border: 1px solid var(--color-border)">
+    <h3 class="text-xl font-bold mb-6" style="color: var(--color-text)">Vincularse con Tokens</h3>
+    <div>
+      <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+        style="color: var(--color-text-muted)">Token Hash</label>
+      <input type="text" [(ngModel)]="joinCode"
+        class="input-primary w-full tracking-widest text-center text-lg uppercase" placeholder="K3P-X9P">
     </div>
-    <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/5">
-      <button (click)="showJoinModal.set(false)" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
-      <button (click)="joinBoard()" [disabled]="!joinCode || loading()" class="btn-primary disabled:opacity-50 text-sm">Verificar e Ingresar</button>
+    <div class="flex justify-end gap-3 mt-8 pt-6" style="border-top: 1px solid var(--color-border)">
+      <button (click)="showJoinModal.set(false)" class="px-4 py-2 text-sm"
+        style="color: var(--color-text-muted)">Cancelar</button>
+      <button (click)="joinBoard()" [disabled]="!joinCode || loading()"
+        class="btn-primary disabled:opacity-50 text-sm">Verificar e Ingresar</button>
     </div>
   </div>
 </div>
 
-<!-- Modal Edit -->
-<div *ngIf="showEditModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-lg">
-    <h3 class="text-xl font-bold mb-6">Editar Pizarra</h3>
+<!-- ══ Modal Edit ══ -->
+<div *ngIf="showEditModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  style="background: rgba(0,0,0,0.80); backdrop-filter: blur(4px)">
+  <div class="p-8 w-full max-w-lg" style="background-color: var(--color-bg); border: 1px solid var(--color-border)">
+    <h3 class="text-xl font-bold mb-6" style="color: var(--color-text)">Editar Pizarra</h3>
     <div class="flex flex-col gap-4">
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Nombre del Proyecto</label>
-        <input type="text" [(ngModel)]="editTitle" class="input-primary w-full" placeholder="Ej. Arquitectura V2">
+        <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+          style="color: var(--color-text-muted)">Nombre</label>
+        <input type="text" [(ngModel)]="editTitle" class="input-primary w-full">
       </div>
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Resumen (Opcional)</label>
-        <textarea [(ngModel)]="editDesc" class="input-primary w-full h-24 resize-none" placeholder="Contexto de esta pizarra..."></textarea>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+          style="color: var(--color-text-muted)">Resumen</label>
+        <textarea [(ngModel)]="editDesc" class="input-primary w-full h-24 resize-none"></textarea>
       </div>
     </div>
-    <div class="flex justify-between items-center mt-8 pt-6 border-t border-white/5">
-      <button (click)="deleteBoard()" [disabled]="loading()" class="px-4 py-2 text-sm text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+    <div class="flex justify-between items-center mt-8 pt-6" style="border-top: 1px solid var(--color-border)">
+      <button (click)="deleteBoard()" [disabled]="loading()" class="px-4 py-2 text-sm flex items-center gap-2"
+        style="color: #EF4444; background: rgba(239,68,68,0.1)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
         Eliminar
       </button>
       <div class="flex gap-3">
-        <button (click)="showEditModal.set(false)" class="px-6 py-2 text-sm text-gray-400 hover:text-white transition-colors">Cancelar</button>
-        <button (click)="updateBoard()" [disabled]="!editTitle || loading()" class="btn-primary disabled:opacity-50 text-sm">Guardar Cambios</button>
+        <button (click)="showEditModal.set(false)" class="px-6 py-2 text-sm"
+          style="color: var(--color-text-muted)">Cancelar</button>
+        <button (click)="updateBoard()" [disabled]="!editTitle || loading()"
+          class="btn-primary disabled:opacity-50 text-sm">Guardar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ══════════════════════════ Modal Perfil de Usuario ══════════════════════════ -->
-<div *ngIf="showProfileModal()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-  <div class="bg-darkBg border border-white/10 p-8 w-full max-w-md relative">
-
-    <!-- Header -->
+<!-- ══ Modal Perfil ══ -->
+<div *ngIf="showProfileModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4"
+  style="background: rgba(0,0,0,0.80); backdrop-filter: blur(4px)">
+  <div class="p-8 w-full max-w-md relative"
+    style="background-color: var(--color-bg); border: 1px solid var(--color-border)">
     <div class="flex items-center justify-between mb-8">
       <div>
-        <h3 class="text-xl font-bold">Perfil de Usuario</h3>
-        <p class="text-xs text-gray-500 mt-1 uppercase tracking-widest">Identidad en el Lobby Colaborativo</p>
+        <h3 class="text-xl font-bold" style="color: var(--color-text)">Perfil de Usuario</h3>
+        <p class="text-xs mt-1 uppercase tracking-widest" style="color: var(--color-text-muted)">Identidad en el Lobby
+        </p>
       </div>
-      <!-- Live preview avatar -->
-      <div class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white transition-all duration-300"
-           [style.background-color]="profileColor"
-           [style.box-shadow]="'0 0 20px ' + profileColor + '80'">
+      <div class="w-12 h-12 flex items-center justify-center text-lg font-black transition-all"
+        [style.background-color]="profileColor" style="color: #0A0A0C">
         {{ (profileName || '?').charAt(0).toUpperCase() }}
       </div>
     </div>
 
     <div class="flex flex-col gap-6">
-
-      <!-- Nombre de usuario -->
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-2 block">Nombre de Visualización</label>
-        <input type="text"
-               [(ngModel)]="profileName"
-               class="input-primary w-full"
-               placeholder="Ej. Capitán Nemo"
-               maxlength="30">
-        <p class="text-[10px] text-gray-600 mt-1.5 tracking-wide">Este nombre aparecerá en tu cursor y notificaciones.</p>
+        <label class="text-xs font-semibold uppercase tracking-wider mb-2 block"
+          style="color: var(--color-text-muted)">Nombre de Visualización</label>
+        <input type="text" [(ngModel)]="profileName" class="input-primary w-full" maxlength="30">
       </div>
 
-      <!-- Color de Cursor -->
       <div>
-        <label class="text-xs font-semibold uppercase text-gray-400 mb-3 block">Color de Cursor</label>
-
-        <!-- Paleta de colores base -->
+        <label class="text-xs font-semibold uppercase tracking-wider mb-3 block"
+          style="color: var(--color-text-muted)">Color de Cursor</label>
         <div class="grid grid-cols-6 gap-2 mb-4">
-          <button *ngFor="let color of PALETTE_COLORS"
-                  (click)="selectPaletteColor(color)"
-                  class="w-8 h-8 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none relative"
-                  [style.background-color]="color"
-                  [style.box-shadow]="profileColor === color ? ('0 0 0 2px #0d0d0d, 0 0 0 4px ' + color) : 'none'"
-                  [title]="color">
+          <button *ngFor="let color of PALETTE_COLORS" (click)="selectPaletteColor(color)"
+            class="w-8 h-8 transition-all hover:scale-110 relative" style="border-radius: 50% !important"
+            [style.background-color]="color"
+            [style.box-shadow]="profileColor === color ? ('0 0 0 2px var(--color-bg), 0 0 0 4px ' + color) : 'none'">
             <span *ngIf="profileColor === color"
-                  class="absolute inset-0 flex items-center justify-center text-white text-xs font-black">✓</span>
+              class="absolute inset-0 flex items-center justify-center text-white text-xs font-black">✓</span>
           </button>
         </div>
-
-        <!-- Separador -->
-        <div class="flex items-center gap-3 mb-4">
-          <div class="flex-1 h-px bg-white/10"></div>
-          <span class="text-[10px] text-gray-600 uppercase tracking-widest">o código personalizado</span>
-          <div class="flex-1 h-px bg-white/10"></div>
-        </div>
-
-        <!-- Entrada HEX / RGB + native picker -->
         <div class="flex items-center gap-3">
-          <!-- Native color picker (rueda) -->
-          <label class="relative w-10 h-10 rounded-full overflow-hidden cursor-pointer flex-shrink-0 hover:scale-110 transition-transform ring-1 ring-white/20"
-                 [style.background-color]="profileColor"
-                 [style.box-shadow]="'0 0 12px ' + profileColor + '80'"
-                 title="Abrir selector nativo">
-            <input type="color"
-                   [value]="profileColor"
-                   (input)="onHexInput($any($event.target).value)"
-                   (change)="selectPaletteColor($any($event.target).value)"
-                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+          <label class="relative w-10 h-10 cursor-pointer hover:scale-110 transition-transform"
+            [style.background-color]="profileColor" style="border-radius: 50% !important">
+            <input type="color" [value]="profileColor" (input)="onHexInput($any($event.target).value)"
+              (change)="selectPaletteColor($any($event.target).value)"
+              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
           </label>
-
-          <!-- HEX / RGB Input field -->
           <div class="flex-1 relative">
-            <input type="text"
-                   [ngModel]="profileColorInput"
-                   (ngModelChange)="onHexInput($event)"
-                   class="input-primary w-full font-mono text-sm pr-10"
-                   placeholder="#00F0FF  ó  rgb(0, 240, 255)"
-                   spellcheck="false">
-            <!-- Color preview swatch inside input -->
-            <div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-white/20"
-                 [style.background-color]="profileColor"></div>
+            <input type="text" [ngModel]="profileColorInput" (ngModelChange)="onHexInput($event)"
+              class="input-primary w-full font-mono text-sm pr-10" placeholder="#00F0FF" spellcheck="false">
+            <div class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4"
+              style="border-radius: 50% !important; border: 1px solid var(--color-border)"
+              [style.background-color]="profileColor"></div>
           </div>
         </div>
-
-        <!-- Live preview bar -->
-        <div class="mt-4 h-1.5 w-full rounded-full transition-all duration-300"
-             [style.background]="'linear-gradient(to right, ' + profileColor + ', ' + profileColor + '40)'"></div>
       </div>
-
     </div>
 
-    <!-- Actions -->
-    <div class="flex justify-end gap-3 mt-8 pt-6 border-t border-white/5">
-      <button (click)="showProfileModal.set(false)"
-              class="px-6 py-2 text-sm text-gray-400 hover:text-white transition-colors">
-        Cancelar
-      </button>
-      <button (click)="saveProfile()"
-              [disabled]="!profileName.trim() || profileSaving()"
-              class="btn-primary disabled:opacity-50 text-sm flex items-center gap-2">
+    <div class="flex justify-end gap-3 mt-8 pt-6" style="border-top: 1px solid var(--color-border)">
+      <button (click)="showProfileModal.set(false)" class="px-6 py-2 text-sm"
+        style="color: var(--color-text-muted)">Cancelar</button>
+      <button (click)="saveProfile()" [disabled]="!profileName.trim() || profileSaving()"
+        class="btn-primary disabled:opacity-50 text-sm flex items-center gap-2">
         <svg *ngIf="profileSaving()" class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>

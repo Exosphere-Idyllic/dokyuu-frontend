@@ -1,0 +1,12 @@
+{
+    "buildCommand": "npm run build -- --configuration production",
+    "outputDirectory": "dist/dokyuu-frontend/browser",
+    "installCommand": "npm ci",
+    "framework": null,
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/index.html"
+        }
+    ]
+}

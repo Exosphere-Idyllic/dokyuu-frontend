@@ -4,30 +4,118 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════
+   DOKYUU — THEME SYSTEM
+   ═══════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="dark"] {
+  --color-bg: #0A0A0C;
+  --color-surface: #121215;
+  --color-accent: #00F0FF;
+  --color-accent-hover: #00C8D4;
+  --color-text: #FFFFFF;
+  --color-text-muted: #6B7280;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
+  --color-glass: rgba(18, 18, 21, 0.60);
+}
+
+[data-theme="light"] {
+  --color-bg: #F4F4F6;
+  --color-surface: #FFFFFF;
+  --color-accent: #0066CC;
+  --color-accent-hover: #0052A3;
+  --color-text: #0D0D0F;
+  --color-text-muted: #6B7280;
+  --color-border: rgba(0, 0, 0, 0.10);
+  --color-border-hover: rgba(0, 0, 0, 0.20);
+  --color-glass: rgba(255, 255, 255, 0.70);
+}
+
+[data-theme="roses"] {
+  --color-bg: #120A12;
+  --color-surface: #1A0D1A;
+  --color-accent: #EC4899;
+  --color-accent-hover: #DB2777;
+  --color-text: #FDF2F8;
+  --color-text-muted: #9D7A8A;
+  --color-border: rgba(236, 72, 153, 0.15);
+  --color-border-hover: rgba(236, 72, 153, 0.30);
+  --color-glass: rgba(26, 13, 26, 0.70);
+}
+
+[data-theme="ponci"] {
+  --color-bg: #120A06;
+  --color-surface: #1A0F0A;
+  --color-accent: #C2622D;
+  --color-accent-hover: #A0501F;
+  --color-text: #FDF6F0;
+  --color-text-muted: #9D8070;
+  --color-border: rgba(194, 98, 45, 0.15);
+  --color-border-hover: rgba(194, 98, 45, 0.30);
+  --color-glass: rgba(26, 15, 10, 0.70);
+}
+
+/* ═══════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════ */
+
 @layer base {
   body {
-    @apply bg-darkBg text-white antialiased selection:bg-neonBlue selection:text-white;
+    background-color: var(--color-bg);
+    color: var(--color-text);
     font-family: 'Inter', sans-serif;
+    @apply antialiased;
+    selection-color: var(--color-accent);
   }
 }
 
-/* Glassmorphism utilities & Strict Aesthetic Overrides */
+/* ═══════════════════════════════════════════════════════
+   UTILIDADES
+   ═══════════════════════════════════════════════════════ */
+
 @layer utilities {
   .glass {
-    @apply bg-darkSurface/60 backdrop-blur-md border border-white/5;
+    background-color: var(--color-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
   }
-  
-  /* El requerimiento explícito es NADA de bordes redondos de acuerdo al User */
-  *, *::before, *::after {
+
+  *,
+  *::before,
+  *::after {
     border-radius: 0 !important;
     box-shadow: none !important;
   }
 
   .btn-primary {
-    @apply bg-neonBlue text-white font-medium py-2 px-4 transition-colors duration-200 hover:bg-neonBlueHover cursor-pointer;
+    background-color: var(--color-accent);
+    color: var(--color-bg);
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s;
+    cursor: pointer;
   }
-  
+
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+  }
+
   .input-primary {
-    @apply bg-darkSurface border border-white/10 text-white py-2 px-3 focus:outline-none focus:border-neonBlue transition-colors duration-200 placeholder:text-gray-500;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 0.5rem 0.75rem;
+    transition: border-color 0.2s;
+  }
+
+  .input-primary::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .input-primary:focus {
+    outline: none;
+    border-color: var(--color-accent);
   }
 }
