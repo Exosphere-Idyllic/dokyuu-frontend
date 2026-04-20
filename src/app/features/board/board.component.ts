@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
-
+import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CanvasService, BoardElement } from '../../core/canvas/canvas.service';
@@ -16,6 +16,7 @@ import { Subject, debounceTime } from 'rxjs';
   templateUrl: './board.component.html',
 })
 export class BoardComponent implements OnInit, OnDestroy {
+  private titleService = inject(Title);
   canvasService = inject(CanvasService);
   authService = inject(AuthService);
   boardsService = inject(BoardsService);
@@ -66,6 +67,16 @@ export class BoardComponent implements OnInit, OnDestroy {
   private zoomTimeout: any;
 
   ngOnInit() {
+    this.boardsService.getBoards().subscribe((boards: any[]) => {
+      const currentBoard = boards.find(b => b._id === this.boardId);
+      if (currentBoard) {
+        this.boardName = currentBoard.name;
+        this.isHost = currentBoard.myRole === 'host';
+        this.boardRole = this.isHost ? 'Host' :
+          currentBoard.myRole === 'member' ? 'Member' : 'Reader';
+        this.titleService.setTitle(`Dokyuu — ${currentBoard.name}`); // ← añadir esta línea
+      }
+    });
     this.boardId = this.route.snapshot.paramMap.get('id')!;
     if (!this.boardId) {
       this.router.navigate(['/dashboard']);

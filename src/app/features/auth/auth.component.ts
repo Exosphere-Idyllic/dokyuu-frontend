@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -10,7 +11,13 @@ import { CommonModule } from '@angular/common';
   imports: [ReactiveFormsModule, CommonModule],
   templateUrl: './auth.component.html',
 })
-export class AuthComponent {
+export class AuthComponent implements OnInit {
+  private titleService = inject(Title);
+
+  ngOnInit() {
+    this.titleService.setTitle('Dokyuu — Iniciar Sesión');
+  }
+
   isLogin = signal<boolean>(true);
   loading = signal<boolean>(false);
   errorMsg = signal<string | null>(null);
@@ -29,16 +36,19 @@ export class AuthComponent {
     this.isLogin.set(!this.isLogin());
     this.errorMsg.set(null);
     this.authForm.reset();
+    this.titleService.setTitle(
+      this.isLogin() ? 'Dokyuu — Iniciar Sesión' : 'Dokyuu — Registro'
+    );
   }
 
   onSubmit() {
     if (this.authForm.invalid) return;
     this.loading.set(true);
     this.errorMsg.set(null);
-    
+
     const { email, password, name } = this.authForm.value;
 
-    const request$ = this.isLogin() 
+    const request$ = this.isLogin()
       ? this.authService.login(email!, password!)
       : this.authService.register(email!, password!, name!);
 

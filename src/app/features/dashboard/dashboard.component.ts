@@ -1,4 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
+import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -13,10 +14,12 @@ import { ThemeService, THEMES, Theme, ThemeId } from '../../core/theme/theme.ser
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
+  private titleService = inject(Title);
   boardsService = inject(BoardsService);
   authService = inject(AuthService);
   themeService = inject(ThemeService);
   router = inject(Router);
+
 
   // ─── Navegación del sidebar ───────────────────────────────────────────────
   activeSidebarTab = signal<'boards' | 'settings'>('boards');
@@ -56,6 +59,7 @@ export class DashboardComponent implements OnInit {
   loading = signal(false);
 
   ngOnInit() {
+    this.titleService.setTitle('Dokyuu — Panel');
     this.fetchBoards();
   }
 
