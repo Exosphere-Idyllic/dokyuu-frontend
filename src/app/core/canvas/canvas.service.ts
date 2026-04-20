@@ -11,11 +11,11 @@ export interface BoardElement {
   y: number;
   color: string;
   createdBy: string;
-  imageUrl?: string;   // URL de Cloudinary — presente solo si type === 'image'
-  width?: number;      // Ancho en px del elemento 
-  height?: number;     // Alto en px del elemento
-  shapeType?: 'square' | 'circle' | 'triangle' | 'arrow' | 'line'; // Tipo de figura
-  rotation?: number;   // Rotación en grados
+  imageUrl?: string;
+  width?: number;
+  height?: number;
+  shapeType?: 'square' | 'circle' | 'triangle' | 'arrow' | 'line';
+  rotation?: number;
 }
 
 export interface CursorPosition {
@@ -24,6 +24,14 @@ export interface CursorPosition {
   displayName?: string;
   cursorColor?: string;
   position: { x: number; y: number };
+}
+
+export interface ConnectedUser {
+  socketId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  cursorColor: string;
 }
 
 export interface CloudinaryUploadResult {
@@ -37,19 +45,25 @@ export interface CloudinaryUploadResult {
 export interface ToastNotification {
   id: number;
   message: string;
-  type: 'info' | 'success' | 'warning';
+  type: 'info' | 'success' | 'warning' | 'error';
 }
 
 @Injectable({ providedIn: 'root' })
 export class CanvasService {
   private http = inject(HttpClient);
   private socket!: Socket;
-  
+
   public elements = signal<BoardElement[]>([]);
   public activeCursors = signal<Record<string, CursorPosition>>({});
   public notifications = signal<ToastNotification[]>([]);
 
-  public addNotification(message: string, type: 'info' | 'success' | 'warning' = 'info') {
+  // Lista de usuarios actualmente conectados a la sala
+  public connectedUsers = signal<ConnectedUser[]>([]);
+
+  // Evento para notificar al componente que el usuario fue expulsado
+  public onKicked: ((data: { boardId: string; message: string }) => void) | null = null;
+
+  public addNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') {
     const id = Date.now();
     this.notifications.update(n => [...n, { id, message, type }]);
     setTimeout(() => {
@@ -58,12 +72,13 @@ export class CanvasService {
   }
 
   connect(boardId: string, token: string) {
-    // Si ya hay un socket activo, desconectarlo limpiamente antes de crear uno nuevo.
-    // Esto previene que eventos de tableros anteriores contaminen la sesión actual.
     if (this.socket) {
       this.socket.removeAllListeners();
       this.socket.disconnect();
     }
+
+    // Limpiar estado al conectar
+    this.connectedUsers.set([]);
 
     this.socket = io(environment.apiUrl, {
       auth: { token },
@@ -73,10 +88,6 @@ export class CanvasService {
       reconnectionDelay: 1000,
     });
 
-    // CORRECCIÓN CRÍTICA: El único punto de entrada para unirse a la sala es el evento
-    // 'connect'. No verificamos this.socket.connected porque justo después de io() el
-    // socket siempre está en proceso de conexión (connected === false). Registrar 'connect'
-    // es la única forma confiable de garantizar que joinBoard se emita una sola vez.
     this.socket.on('connect', () => {
       console.log(`[WSS] Conectado (${this.socket.id}). Uniéndose al tablero ${boardId}...`);
       this.socket.emit('joinBoard', { boardId }, (res: any) => {
@@ -94,23 +105,28 @@ export class CanvasService {
       console.warn('[WSS] Desconectado:', reason);
     });
 
-    // Recibir actualizaciones del canvas provenientes de OTROS usuarios vía broadcast
+    // Lista completa de usuarios conectados (actualizada por el servidor)
+    this.socket.on('room:users', (users: ConnectedUser[]) => {
+      this.connectedUsers.set(users);
+    });
+
+    // Recibir actualizaciones del canvas
     this.socket.on('canvas:update', (incomingElements: BoardElement[]) => {
       this.elements.set(incomingElements);
     });
 
-    // Recibir posiciones de cursores de otros usuarios
+    // Recibir posiciones de cursores
     this.socket.on('cursor:move', (data: CursorPosition) => {
       this.activeCursors.update(cursors => ({ ...cursors, [data.userId]: data }));
     });
 
-    // Manejar conexión de usuarios
+    // Usuario conectado
     this.socket.on('user:joined', (data: { userId: string; email: string; displayName?: string; cursorColor?: string }) => {
       const name = data.displayName || data.email.split('@')[0];
       this.addNotification(`${name} se ha conectado`, 'success');
     });
 
-    // Manejar desconexión de usuarios
+    // Usuario desconectado
     this.socket.on('user:left', (data: { userId: string; email: string; displayName?: string }) => {
       const name = data.displayName || data.email.split('@')[0];
       this.addNotification(`${name} se ha desconectado`, 'warning');
@@ -119,6 +135,15 @@ export class CanvasService {
         delete newCursors[data.userId];
         return newCursors;
       });
+    });
+
+    // El usuario actual fue expulsado
+    this.socket.on('kicked', (data: { boardId: string; message: string }) => {
+      console.warn('[WSS] Expulsado de la sala:', data);
+      this.addNotification('Has sido expulsado de la pizarra.', 'error');
+      if (this.onKicked) {
+        this.onKicked(data);
+      }
     });
   }
 
@@ -129,10 +154,25 @@ export class CanvasService {
   }
 
   emitCanvasUpdate(boardId: string, elements: BoardElement[]) {
-    this.elements.set(elements); // Optimistic UI Update Frontend
+    this.elements.set(elements);
     if (this.socket?.connected) {
-      this.socket.emit('canvas:update', { boardId, elements }); // Broadcast WSS Backend
+      this.socket.emit('canvas:update', { boardId, elements });
     }
+  }
+
+  /**
+   * Expulsar a un usuario de la sala (solo host)
+   */
+  kickUser(boardId: string, targetUserId: string): Promise<{ success: boolean; message: string }> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) {
+        resolve({ success: false, message: 'Sin conexión al servidor' });
+        return;
+      }
+      this.socket.emit('kick:user', { boardId, targetUserId }, (res: any) => {
+        resolve(res ?? { success: false, message: 'Sin respuesta del servidor' });
+      });
+    });
   }
 
   // ─── Cloudinary ───────────────────────────────────────────────────────────
@@ -156,6 +196,7 @@ export class CanvasService {
       this.socket.removeAllListeners();
       this.socket.disconnect();
       this.activeCursors.set({});
+      this.connectedUsers.set([]);
     }
   }
 }

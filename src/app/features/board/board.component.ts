@@ -28,18 +28,21 @@ export class BoardComponent implements OnInit, OnDestroy {
   uploadError: string | null = null;
   hasRoleAccess = true;
   isLoading = true;
-  showLoading = true; // controla el *ngIf del loading (se oculta después del fundido)
+  showLoading = true;
 
   @ViewChild('loadingRef') loadingRef!: LoadingComponent;
-  
+
   boardName: string = 'Cargando...';
   boardRole: string = 'Conectando...';
+  isHost = false;
 
-  // Referencia al input oculto de archivos para activarlo con el botón
+  // Panel de usuarios conectados
+  showUsersPanel = false;
+  kickingUserId: string | null = null; // ID del usuario siendo expulsado (para loading state)
+
   @ViewChild('imageInput') imageInputRef!: ElementRef<HTMLInputElement>;
 
-  // RxJS Subjects para optimización extrema y prevenir saturación
-  private cursorSubject = new Subject<{x: number, y: number}>();
+  private cursorSubject = new Subject<{ x: number, y: number }>();
   private saveSubject = new Subject<BoardElement[]>();
 
   draggingId: string | null = null;
@@ -50,10 +53,8 @@ export class BoardComponent implements OnInit, OnDestroy {
   resizeStartH = 0;
   isRotatingId: string | null = null;
 
-  // --- Selección de Figuras ---
   selectedShapeId: string | null = null;
 
-  // --- Pan & Zoom / Infinite Canvas ---
   isPanning = false;
   panX = 0;
   panY = 0;
@@ -67,32 +68,37 @@ export class BoardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.boardId = this.route.snapshot.paramMap.get('id')!;
     if (!this.boardId) {
-       this.router.navigate(['/dashboard']);
-       return;
+      this.router.navigate(['/dashboard']);
+      return;
     }
 
     const token = this.authService.currentUser()?.token;
     if (!token) {
-       this.router.navigate(['/auth']);
-       return;
+      this.router.navigate(['/auth']);
+      return;
     }
 
     this.boardsService.getBoards().subscribe((boards: any[]) => {
       const currentBoard = boards.find(b => b._id === this.boardId);
       if (currentBoard) {
         this.boardName = currentBoard.name;
-        this.boardRole = currentBoard.myRole === 'host' ? 'Host' : 
-                         currentBoard.myRole === 'member' ? 'Member' : 'Reader';
+        this.isHost = currentBoard.myRole === 'host';
+        this.boardRole = this.isHost ? 'Host' :
+          currentBoard.myRole === 'member' ? 'Member' : 'Reader';
       }
     });
 
-    // Levantar túnel de conexión en tiempo real
+    // Registrar callback de expulsión ANTES de conectar
+    this.canvasService.onKicked = (data) => {
+      setTimeout(() => {
+        this.router.navigate(['/dashboard']);
+      }, 2000); // Dar tiempo para que el usuario vea la notificación
+    };
+
     this.canvasService.connect(this.boardId, token);
 
-    // Cargar datos estáticos iniciales desde la Base de Datos
     this.canvasService.loadElements(this.boardId).subscribe((elements: BoardElement[]) => {
       this.canvasService.elements.set(elements || []);
-      // Iniciar fundido suave en vez de corte abrupto
       this.isLoading = false;
       if (this.loadingRef) {
         this.loadingRef.startFadeOut();
@@ -101,12 +107,10 @@ export class BoardComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Filtros de Tasa (FPS Control) para el Mouse Local -> WSS
-    this.cursorSubject.pipe(debounceTime(30)).subscribe((pos: {x: number, y: number}) => {
+    this.cursorSubject.pipe(debounceTime(30)).subscribe((pos: { x: number, y: number }) => {
       this.canvasService.emitCursorMove(this.boardId, pos.x, pos.y);
     });
 
-    // Petición a REST MongoDB ejecutada "silenciosamente" tras 2 segundos de inactividad de dibujo
     this.saveSubject.pipe(debounceTime(2000)).subscribe((elements: BoardElement[]) => {
       this.isSaving = true;
       this.canvasService.saveElements(this.boardId, elements).subscribe({
@@ -117,23 +121,48 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.canvasService.onKicked = null;
     this.canvasService.disconnect();
   }
 
-  // --- OYENTES DE EVENTOS FÍSICOS WINDOWS/MAC ---
+  // ─── Expulsión de usuarios ────────────────────────────────────────────────
+
+  async kickUser(targetUserId: string, targetName: string) {
+    if (!this.isHost) return;
+    if (!confirm(`¿Expulsar a ${targetName} de la pizarra?`)) return;
+
+    this.kickingUserId = targetUserId;
+    const result = await this.canvasService.kickUser(this.boardId, targetUserId);
+    this.kickingUserId = null;
+
+    if (result.success) {
+      this.canvasService.addNotification(`${targetName} fue expulsado`, 'warning');
+    } else {
+      this.canvasService.addNotification(`Error: ${result.message}`, 'error');
+    }
+  }
+
+  // ─── Helpers de UI ────────────────────────────────────────────────────────
+
+  get currentUserId(): string {
+    return this.authService.currentUser()?.sub ?? '';
+  }
+
+  toggleUsersPanel() {
+    this.showUsersPanel = !this.showUsersPanel;
+  }
+
+  // ─── Oyentes de eventos físicos ───────────────────────────────────────────
+
   startPan(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    // Iniciamos pan si hacemos clic en el wrapper del canvas (fondo)
     if (target.classList.contains('canvas-wrapper') || target.classList.contains('canvas-layer')) {
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
-      // Deseleccionar la figura activa al hacer clic en el fondo
       this.selectedShapeId = null;
     }
   }
-
-
 
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
@@ -158,13 +187,12 @@ export class BoardComponent implements OnInit, OnDestroy {
           const mouseX = (e.clientX - this.panX) / this.zoom;
           const mouseY = (e.clientY - this.panY) / this.zoom;
           let angle = Math.atan2(mouseY - centerY, mouseX - centerX) * (180 / Math.PI);
-          angle = angle + 90; // offset so dragging from top handle is 0 rotation
+          angle = angle + 90;
           return { ...el, rotation: angle };
         }
         return el;
       });
       this.canvasService.elements.set(updated);
-      this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom });
       return;
     }
 
@@ -174,17 +202,15 @@ export class BoardComponent implements OnInit, OnDestroy {
       const current = this.canvasService.elements();
       const updated = current.map(el => {
         if (el.id === this.resizingId) {
-          return { 
-            ...el, 
-            width: Math.max(20, this.resizeStartW + dx), 
-            height: Math.max(20, this.resizeStartH + dy) 
+          return {
+            ...el,
+            width: Math.max(20, this.resizeStartW + dx),
+            height: Math.max(20, this.resizeStartH + dy)
           };
         }
         return el;
       });
-      // We only emit locally rapidly to not saturate, saveSubject handles DB
       this.canvasService.elements.set(updated);
-      this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom }); // prevent stutter
       return;
     }
 
@@ -192,10 +218,10 @@ export class BoardComponent implements OnInit, OnDestroy {
       const current = this.canvasService.elements();
       const updated = current.map(el => {
         if (el.id === this.draggingId) {
-          return { 
-             ...el, 
-             x: ((e.clientX - this.panX) / this.zoom) - this.dragOffsetX, 
-             y: ((e.clientY - this.panY) / this.zoom) - this.dragOffsetY 
+          return {
+            ...el,
+            x: ((e.clientX - this.panX) / this.zoom) - this.dragOffsetX,
+            y: ((e.clientY - this.panY) / this.zoom) - this.dragOffsetY
           };
         }
         return el;
@@ -207,7 +233,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   @HostListener('mouseup')
   onMouseUp() {
     this.isPanning = false;
-    
+
     if (this.resizingId) {
       this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
       this.saveSubject.next(this.canvasService.elements());
@@ -226,7 +252,8 @@ export class BoardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // --- MOTOR DE ELEMENTOS ---
+  // ─── Motor de elementos ───────────────────────────────────────────────────
+
   addNote() {
     const user = this.authService.currentUser();
     const newNote: BoardElement = {
@@ -255,7 +282,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       y: (window.innerHeight / 2 - this.panY) / this.zoom - 50,
       width: 100,
       height: 100,
-      color: '#3B82F6', // Color default (ej. neonBlue-ish)
+      color: '#3B82F6',
       createdBy: user?.sub!
     };
 
@@ -273,7 +300,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   startResize(e: MouseEvent, note: BoardElement) {
-    e.stopPropagation(); // Evitar arrastrar el elemento principal
+    e.stopPropagation();
     this.resizingId = note.id;
     this.resizeStartW = note.width || 100;
     this.resizeStartH = note.height || 100;
@@ -286,19 +313,16 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.isRotatingId = note.id;
   }
 
-  // Abre el selector de archivos nativo del sistema operativo
   triggerImageUpload() {
     this.uploadError = null;
-    this.imageInputRef.nativeElement.value = ''; // Resetear para permitir subir el mismo archivo de nuevo
+    this.imageInputRef.nativeElement.value = '';
     this.imageInputRef.nativeElement.click();
   }
 
-  // Recibe el archivo seleccionado, lo sube a Cloudinary y crea el elemento en el canvas
   onImageFileSelected(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    // Validación de tamaño en el cliente antes de siquiera intentar subir
     if (file.size > 8 * 1024 * 1024) {
       this.uploadError = 'El archivo supera el límite de 8MB.';
       return;
@@ -311,7 +335,6 @@ export class BoardComponent implements OnInit, OnDestroy {
       next: (res: { url: string; publicId: string; width: number; height: number; message: string }) => {
         const user = this.authService.currentUser();
 
-        // Calcular dimensiones: mantener proporción pero con límite máximo de 400x300
         const MAX_W = 400;
         const MAX_H = 300;
         const ratio = Math.min(MAX_W / res.width, MAX_H / res.height, 1);
@@ -321,7 +344,7 @@ export class BoardComponent implements OnInit, OnDestroy {
         const newImage: BoardElement = {
           id: Math.random().toString(36).substr(2, 9),
           type: 'image',
-          content: file.name, // Nombre del archivo como label accesible
+          content: file.name,
           x: Math.max(0, window.innerWidth / 2 - displayW / 2) - this.panX,
           y: Math.max(60, window.innerHeight / 2 - displayH / 2) - this.panY,
           color: 'transparent',
@@ -344,7 +367,6 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   startDrag(e: MouseEvent, note: BoardElement) {
-    // Evitar arrastrar si da clic en la textarea (notas) o en la imagen directamente
     if ((e.target as HTMLElement).tagName.toLowerCase() === 'textarea') return;
     this.draggingId = note.id;
     this.dragOffsetX = ((e.clientX - this.panX) / this.zoom) - note.x;
@@ -366,13 +388,11 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.saveSubject.next(updated);
   }
 
-  // Seleccionar una figura al hacer clic
   selectShape(e: MouseEvent, note: BoardElement) {
     e.stopPropagation();
     this.selectedShapeId = note.id;
   }
 
-  // Deformar (estirar) la figura cambiando la proporción ancho/alto
   deformShape(id: string, axis: 'wider' | 'taller' | 'reset') {
     const updated = this.canvasService.elements().map(el => {
       if (el.id === id) {
@@ -390,7 +410,6 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.saveSubject.next(updated);
   }
 
-  // Rotar la figura 45° en sentido horario
   rotateShape(id: string) {
     const updated = this.canvasService.elements().map(el => {
       if (el.id === id) {
@@ -406,25 +425,21 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.router.navigate(['/dashboard']);
   }
 
-  // Prevención de re-renderizado destructivo de Angular
   trackByNoteId(index: number, note: BoardElement) {
     return note.id;
   }
 
-  // Zoom Implementación
   @HostListener('wheel', ['$event'])
   onWheel(e: WheelEvent) {
-    // Solo aplicar zoom si no estamos haciendo scroll dentro de una nota
     if (e.target instanceof HTMLElement && e.target.tagName.toLowerCase() === 'textarea') {
-      return; 
+      return;
     }
-    
-    e.preventDefault(); 
-    
-    // Zoom in (acercar) o Zoom out (alejar)
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1; 
+
+    e.preventDefault();
+
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.min(Math.max(0.1, this.zoom * zoomFactor), 4);
-    
+
     if (newZoom !== this.zoom) {
       const mouseX = e.clientX;
       const mouseY = e.clientY;
@@ -434,7 +449,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.zoom = newZoom;
 
       this.showZoomUi();
-      this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements()); 
+      this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
     }
   }
 
@@ -447,14 +462,14 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   changeZoom(delta: number) {
-     const newZoom = Math.min(Math.max(0.1, this.zoom + delta), 4);
-     const centerX = window.innerWidth / 2;
-     const centerY = window.innerHeight / 2;
-     
-     this.panX = centerX - (centerX - this.panX) * (newZoom / this.zoom);
-     this.panY = centerY - (centerY - this.panY) * (newZoom / this.zoom);
-     this.zoom = newZoom;
-     
-     this.showZoomUi();
+    const newZoom = Math.min(Math.max(0.1, this.zoom + delta), 4);
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+
+    this.panX = centerX - (centerX - this.panX) * (newZoom / this.zoom);
+    this.panY = centerY - (centerY - this.panY) * (newZoom / this.zoom);
+    this.zoom = newZoom;
+
+    this.showZoomUi();
   }
 }
