@@ -160,6 +160,25 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  deleteBoard() {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta pizarra? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    
+    this.loading.set(true);
+    this.boardsService.deleteBoard(this.editBoardId).subscribe({
+      next: () => {
+        this.showEditModal.set(false);
+        this.loading.set(false);
+        this.fetchBoards();
+      },
+      error: () => {
+        this.loading.set(false);
+        alert('Error al eliminar la pizarra');
+      }
+    });
+  }
+
   openBoard(id: string) {
     this.router.navigate(['/board', id]);
   }

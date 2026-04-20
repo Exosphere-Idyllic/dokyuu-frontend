@@ -34,4 +34,8 @@ export class BoardsService {
   updateBoard(id: string, name: string, description: string) {
     return this.http.put<Board>(`${this.apiUrl}/${id}`, { name, description });
   }
+
+  deleteBoard(id: string) {
+    return this.http.delete<any>(`${this.apiUrl}/${id}`);
+  }
 }
