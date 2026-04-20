@@ -1,5 +1,5 @@
 {
-    "buildCommand": "npm run build -- --configuration production",
+    "buildCommand": "npm run build",
     "outputDirectory": "dist/dokyuu-frontend/browser",
     "installCommand": "npm ci",
     "framework": null,
