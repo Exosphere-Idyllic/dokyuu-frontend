@@ -48,6 +48,20 @@ export interface ToastNotification {
   type: 'info' | 'success' | 'warning' | 'error';
 }
 
+export interface ChatSender {
+  _id: string;
+  displayName?: string;
+  email: string;
+}
+
+export interface ChatMessage {
+  _id: string;
+  boardId: string;
+  sender: ChatSender;
+  message: string;
+  createdAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CanvasService {
   private http = inject(HttpClient);
@@ -59,9 +73,11 @@ export class CanvasService {
 
   // Lista de usuarios actualmente conectados a la sala
   public connectedUsers = signal<ConnectedUser[]>([]);
+  public chatMessages = signal<ChatMessage[]>([]);
 
   // Evento para notificar al componente que el usuario fue expulsado
   public onKicked: ((data: { boardId: string; message: string }) => void) | null = null;
+  public onChatMessageReceived: ((msg: ChatMessage) => void) | null = null;
 
   public addNotification(message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') {
     const id = Date.now();
@@ -79,6 +95,7 @@ export class CanvasService {
 
     // Limpiar estado al conectar
     this.connectedUsers.set([]);
+    this.chatMessages.set([]);
 
     this.socket = io(environment.apiUrl, {
       auth: { token },
@@ -108,6 +125,19 @@ export class CanvasService {
     // Lista completa de usuarios conectados (actualizada por el servidor)
     this.socket.on('room:users', (users: ConnectedUser[]) => {
       this.connectedUsers.set(users);
+    });
+
+    // Recibir historial de chat
+    this.socket.on('chat:history', (history: ChatMessage[]) => {
+      this.chatMessages.set(history || []);
+    });
+
+    // Recibir nuevos mensajes de chat
+    this.socket.on('chat:message', (msg: ChatMessage) => {
+      this.chatMessages.update(msgs => [...msgs, msg]);
+      if (this.onChatMessageReceived) {
+        this.onChatMessageReceived(msg);
+      }
     });
 
     // Recibir actualizaciones del canvas
@@ -157,6 +187,12 @@ export class CanvasService {
     this.elements.set(elements);
     if (this.socket?.connected) {
       this.socket.emit('canvas:update', { boardId, elements });
+    }
+  }
+
+  sendChatMessage(boardId: string, message: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('chat:send', { boardId, message });
     }
   }
 

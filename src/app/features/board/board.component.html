@@ -128,6 +128,11 @@
         [ngClass]="showUsersPanel 
           ? 'border-neonBlue/60 bg-neonBlue/10 text-neonBlue' 
           : 'border-white/10 bg-darkSurface hover:bg-white/5 text-gray-300 hover:text-white'">
+        <!-- Badge de mensajes no leídos -->
+        <span *ngIf="unreadMessagesCount > 0"
+          class="absolute -top-1.5 -left-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-black rounded-none shadow-[0_0_8px_#ef4444] animate-pulse">
+          {{ unreadMessagesCount }}
+        </span>
         <!-- Ícono de personas -->
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
@@ -145,29 +150,59 @@
     </div>
   </header>
 
-  <!-- ═══ PANEL LATERAL DE USUARIOS CONECTADOS ═══ -->
+  <!-- ═══ PANEL LATERAL DE COLABORACIÓN (USUARIOS Y CHAT) ═══ -->
   <aside *ngIf="showUsersPanel"
-    class="absolute top-[73px] right-0 w-72 h-[calc(100vh-73px)] bg-darkSurface/95 backdrop-blur-md border-l border-white/10 z-40 flex flex-col pointer-events-auto"
+    class="absolute top-[73px] right-0 w-72 h-[calc(100vh-73px)] bg-darkSurface/70 backdrop-blur-lg border-l border-white/10 z-40 flex flex-col pointer-events-auto shadow-2xl"
     (mousedown)="$event.stopPropagation()">
 
-    <!-- Header del panel -->
-    <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
-      <div>
-        <h2 class="text-xs font-bold uppercase tracking-widest text-white">Usuarios Conectados</h2>
-        <p class="text-[10px] text-gray-500 mt-0.5 font-mono">
-          {{ canvasService.connectedUsers().length }} en línea
-          <span *ngIf="isHost" class="text-amber-400 ml-1">· Modo Host</span>
-        </p>
+    <!-- Header del panel con pestañas -->
+    <div class="border-b border-white/10 flex flex-col flex-shrink-0 bg-black/25">
+      <div class="flex border-b border-white/5">
+        <button (click)="selectTab('users')"
+          class="flex-1 py-3 text-center text-xs font-bold uppercase tracking-widest transition-all duration-200 outline-none"
+          [ngClass]="activeTab === 'users' 
+            ? 'text-white border-b-2 border-neonBlue bg-white/5' 
+            : 'text-gray-400 hover:text-white bg-transparent'">
+          Usuarios
+        </button>
+        <button (click)="selectTab('chat')"
+          class="flex-1 py-3 text-center text-xs font-bold uppercase tracking-widest transition-all duration-200 outline-none relative"
+          [ngClass]="activeTab === 'chat' 
+            ? 'text-white border-b-2 border-neonBlue bg-white/5' 
+            : 'text-gray-400 hover:text-white bg-transparent'">
+          Chat
+          <!-- Mini badge para indicar mensajes no leídos en la pestaña de chat -->
+          <span *ngIf="unreadMessagesCount > 0"
+            class="ml-1 px-1 bg-red-500 text-white text-[8px] font-black rounded-sm">
+            {{ unreadMessagesCount }}
+          </span>
+        </button>
       </div>
-      <!-- Indicador live -->
-      <div class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span class="text-[9px] text-emerald-500 uppercase tracking-widest font-mono">Live</span>
+      
+      <!-- Sub-info condicional del Header -->
+      <div class="px-5 py-3 flex items-center justify-between">
+        <div *ngIf="activeTab === 'users'">
+          <h2 class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Usuarios Conectados</h2>
+          <p class="text-[9px] text-gray-500 mt-0.5 font-mono">
+            {{ canvasService.connectedUsers().length }} en línea
+            <span *ngIf="isHost" class="text-amber-400 ml-1">· Host</span>
+          </p>
+        </div>
+        <div *ngIf="activeTab === 'chat'">
+          <h2 class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Historial</h2>
+          <p class="text-[9px] text-gray-500 mt-0.5 font-mono">
+            {{ canvasService.chatMessages().length }} mensajes
+          </p>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-[9px] text-emerald-500 uppercase tracking-widest font-mono">Live</span>
+        </div>
       </div>
     </div>
 
-    <!-- Lista de usuarios -->
-    <div
+    <!-- Pestaña 1: Lista de usuarios -->
+    <div *ngIf="activeTab === 'users'"
       class="flex-1 overflow-y-auto py-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
       <!-- Estado vacío -->
@@ -235,8 +270,72 @@
       </div>
     </div>
 
-    <!-- Footer del panel: instrucción para host -->
-    <div *ngIf="isHost" class="px-5 py-3 border-t border-white/5 flex-shrink-0">
+    <!-- Pestaña 2: Chat de la pizarra -->
+    <div *ngIf="activeTab === 'chat'" 
+      #chatMessagesContainer
+      class="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      
+      <!-- Estado vacío -->
+      <div *ngIf="canvasService.chatMessages().length === 0"
+        class="flex flex-col items-center justify-center h-full gap-3 text-gray-600">
+        <svg class="w-8 h-8 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <p class="text-[10px] uppercase tracking-widest">Sin mensajes aún</p>
+      </div>
+
+      <!-- Mensajes del chat -->
+      <div *ngFor="let msg of canvasService.chatMessages()" class="flex flex-col gap-1 max-w-full">
+        <!-- Cabecera del mensaje: Nombre y Hora -->
+        <div class="flex items-baseline justify-between gap-2 px-1">
+          <span class="text-[10px] font-bold text-gray-300 truncate max-w-[170px]" 
+            [title]="msg.sender.displayName || msg.sender.email">
+            {{ msg.sender.displayName || msg.sender.email.split('@')[0] }}
+          </span>
+          <span class="text-[9px] text-gray-500 font-mono">
+            {{ msg.createdAt | date:'HH:mm' }}
+          </span>
+        </div>
+
+        <!-- Cuerpo del mensaje -->
+        <div class="flex items-start gap-2">
+          <!-- Avatar del remitente -->
+          <div class="w-6 h-6 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-white"
+            [style.background-color]="getMemberColor(msg.sender._id)"
+            [style.box-shadow]="'0 0 6px ' + getMemberColor(msg.sender._id) + '40'"
+            style="border-radius: 0;">
+            {{ (msg.sender.displayName || msg.sender.email || '?').charAt(0).toUpperCase() }}
+          </div>
+          
+          <!-- Burbuja de texto -->
+          <div class="flex-1 px-3 py-1.5 text-xs border leading-relaxed break-words"
+            [ngClass]="msg.sender._id === currentUserId
+              ? 'bg-neonBlue/10 border-neonBlue/30 text-white'
+              : 'bg-white/5 border-white/10 text-gray-300'">
+            {{ msg.message }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input de envío de chat (Solo si activeTab === 'chat') -->
+    <div *ngIf="activeTab === 'chat'" 
+      class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex items-center gap-2">
+      <input type="text" [(ngModel)]="newMessageText" (keyup.enter)="sendMessage()"
+        placeholder="Escribe un mensaje..."
+        class="flex-1 bg-black/40 border border-white/10 px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-neonBlue/50" />
+      <button (click)="sendMessage()"
+        class="btn-primary !p-2 flex items-center justify-center shrink-0 w-8 h-8 font-bold">
+        <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Footer del panel: instrucción para host (Solo si activeTab === 'users' y es host) -->
+    <div *ngIf="activeTab === 'users' && isHost" class="px-5 py-3 border-t border-white/5 flex-shrink-0">
       <p class="text-[9px] text-gray-600 uppercase tracking-wider leading-relaxed">
         <span class="text-amber-400/70">↑</span> Pasa el cursor sobre un usuario para ver la opción de expulsión
       </p>

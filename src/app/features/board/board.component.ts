@@ -37,11 +37,15 @@ export class BoardComponent implements OnInit, OnDestroy {
   boardRole: string = 'Conectando...';
   isHost = false;
 
-  // Panel de usuarios conectados
+  // Panel de usuarios conectados y chat
   showUsersPanel = false;
+  activeTab: 'users' | 'chat' = 'users';
+  newMessageText = '';
+  unreadMessagesCount = 0;
   kickingUserId: string | null = null; // ID del usuario siendo expulsado (para loading state)
 
   @ViewChild('imageInput') imageInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('chatMessagesContainer') chatMessagesContainer!: ElementRef;
 
   private cursorSubject = new Subject<{ x: number, y: number }>();
   private saveSubject = new Subject<BoardElement[]>();
@@ -106,6 +110,14 @@ export class BoardComponent implements OnInit, OnDestroy {
       }, 2000); // Dar tiempo para que el usuario vea la notificación
     };
 
+    this.canvasService.onChatMessageReceived = (msg) => {
+      if (!this.showUsersPanel || this.activeTab !== 'chat') {
+        this.unreadMessagesCount++;
+      } else {
+        this.scrollToBottom();
+      }
+    };
+
     this.canvasService.connect(this.boardId, token);
 
     this.canvasService.loadElements(this.boardId).subscribe((elements: BoardElement[]) => {
@@ -133,6 +145,7 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.canvasService.onKicked = null;
+    this.canvasService.onChatMessageReceived = null;
     this.canvasService.disconnect();
   }
 
@@ -161,6 +174,39 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   toggleUsersPanel() {
     this.showUsersPanel = !this.showUsersPanel;
+    if (this.showUsersPanel && this.activeTab === 'chat') {
+      this.unreadMessagesCount = 0;
+      this.scrollToBottom();
+    }
+  }
+
+  selectTab(tab: 'users' | 'chat') {
+    this.activeTab = tab;
+    if (tab === 'chat') {
+      this.unreadMessagesCount = 0;
+      this.scrollToBottom();
+    }
+  }
+
+  sendMessage() {
+    if (!this.newMessageText || !this.newMessageText.trim()) return;
+    this.canvasService.sendChatMessage(this.boardId, this.newMessageText.trim());
+    this.newMessageText = '';
+    this.scrollToBottom();
+  }
+
+  scrollToBottom() {
+    setTimeout(() => {
+      if (this.chatMessagesContainer) {
+        const element = this.chatMessagesContainer.nativeElement;
+        element.scrollTop = element.scrollHeight;
+      }
+    }, 50);
+  }
+
+  getMemberColor(userId: string): string {
+    const user = this.canvasService.connectedUsers().find(u => u.userId === userId);
+    return user?.cursorColor || '#4F46E5';
   }
 
   // ─── Oyentes de eventos físicos ───────────────────────────────────────────
