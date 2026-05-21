@@ -20,11 +20,10 @@ export class DashboardComponent implements OnInit {
   themeService = inject(ThemeService);
   router = inject(Router);
 
-
-  // ─── Navegación del sidebar ───────────────────────────────────────────────
+  //  Navegación del sidebar 
   activeSidebarTab = signal<'boards' | 'settings'>('boards');
 
-  // ─── Board Signals ────────────────────────────────────────────────────────
+  //  Board Signals 
   hostBoards = signal<Board[]>([]);
   guestBoards = signal<any[]>([]);
 
@@ -32,7 +31,7 @@ export class DashboardComponent implements OnInit {
   showJoinModal = signal(false);
   showEditModal = signal(false);
 
-  // ─── Profile Modal ────────────────────────────────────────────────────────
+  //  Profile Modal 
   showProfileModal = signal(false);
   profileName = '';
   profileColor = '#00F0FF';
@@ -45,7 +44,7 @@ export class DashboardComponent implements OnInit {
     '#14B8A6', '#06B6D4', '#6366F1', '#F43F5E',
   ];
 
-  // ─── Theme ────────────────────────────────────────────────────────────────
+  //  Theme 
   readonly themes: Theme[] = THEMES;
 
   newTitle = '';
@@ -63,12 +62,12 @@ export class DashboardComponent implements OnInit {
     this.fetchBoards();
   }
 
-  // ─── Sidebar nav ──────────────────────────────────────────────────────────
+  //  Sidebar nav 
   setTab(tab: 'boards' | 'settings') {
     this.activeSidebarTab.set(tab);
   }
 
-  // ─── Themes ───────────────────────────────────────────────────────────────
+  //  Themes 
   selectTheme(id: ThemeId) {
     this.themeService.setTheme(id);
   }
@@ -77,7 +76,7 @@ export class DashboardComponent implements OnInit {
     return this.themeService.currentTheme() === id;
   }
 
-  // ─── Boards ───────────────────────────────────────────────────────────────
+  //  Boards 
   fetchBoards() {
     this.boardsService.getBoards().subscribe({
       next: (boards: any[]) => {
