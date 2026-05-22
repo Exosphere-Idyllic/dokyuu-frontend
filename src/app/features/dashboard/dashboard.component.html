@@ -32,11 +32,21 @@
             </path>
           </svg>
         </button>
+         <!-- Agendar reunión -->
+      <button #calendarBtn (click)="toggleCalendar()"
+        class="w-full mb-3 text-xs px-3 py-2 transition-all uppercase tracking-widest font-semibold"
+        [style.background]="showCalendar() ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'var(--color-border)'"
+        [style.color]="showCalendar() ? 'var(--color-accent)' : 'var(--color-text-muted)'"
+        [style.border]="showCalendar() ? '1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)' : '1px solid var(--color-border)'">
+        Agendar reunión
+      </button>
       </nav>
     </div>
 
     <!-- User & Logout -->
     <div style="border-top: 1px solid var(--color-border)" class="pt-6">
+
+
       <div class="flex items-center gap-3 mb-4">
         <div class="w-8 h-8 flex-shrink-0 flex items-center justify-center text-xs font-black shadow-lg"
           [style.background-color]="authService.currentUser()?.cursorColor || 'var(--color-accent)'"
@@ -65,13 +75,23 @@
         </svg>
       </button>
 
-      <button (click)="logout()"
-        class="w-full text-left text-xs px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-between"
-        style="background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.2)">
-        Cerrar Sesión <span>✕</span>
-      </button>
+      <!-- Cerrar Sesión -->
+      <div class="flex gap-2">
+        <button (click)="logout()"
+          class="w-full text-xs px-3 py-2 transition-colors uppercase tracking-widest font-semibold flex items-center justify-center gap-1"
+          style="background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.2)">
+          Salir <span>✕</span>
+        </button>
+      </div>
     </div>
   </aside>
+
+  <!-- ═══ CALENDAR WIDGET ═══ -->
+  <app-calendar-widget
+    *ngIf="showCalendar()"
+    [anchorRect]="calendarAnchorRect"
+    (close)="showCalendar.set(false)">
+  </app-calendar-widget>
 
   <!-- ═══ MAIN CONTENT ═══ -->
   <main

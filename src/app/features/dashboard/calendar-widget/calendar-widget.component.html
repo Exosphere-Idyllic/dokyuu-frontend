@@ -1,0 +1,86 @@
+<div
+  class="fixed z-50 select-none overflow-hidden"
+  [style.left.px]="posX()"
+  [style.top.px]="posY()"
+  [style.width.px]="width()"
+  style="
+    background: #1e1e1e;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+    font-family: system-ui, sans-serif;
+  "
+  (mousedown)="onDragStart($event)">
+
+  <!-- ─── Header: fecha seleccionada ──────────────────────────────────── -->
+  <div class="flex items-center justify-between px-4 py-3 cursor-grab active:cursor-grabbing"
+    style="background: #2a2a2a; border-bottom: 1px solid rgba(255,255,255,0.07)">
+    <span class="text-sm font-medium" style="color: #e0e0e0">{{ headerDate() }}</span>
+    <button (click)="close.emit()"
+      class="w-6 h-6 flex items-center justify-center rounded transition-colors"
+      style="color: #888"
+      onmouseover="this.style.background='rgba(255,255,255,0.08)'; this.style.color='#ccc'"
+      onmouseout="this.style.background='transparent'; this.style.color='#888'">
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ─── Sub-header: mes + flechas ───────────────────────────────────── -->
+  <div class="flex items-center justify-between px-4 py-3 cursor-grab active:cursor-grabbing">
+    <span class="text-sm font-semibold" style="color: #c8c8c8">{{ monthLabel() }}</span>
+    <div class="flex flex-col gap-0.5">
+      <button (click)="prevMonth()"
+        class="w-5 h-4 flex items-center justify-center rounded transition-colors"
+        style="color: #666"
+        onmouseover="this.style.color='#bbb'"
+        onmouseout="this.style.color='#666'">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+      </button>
+      <button (click)="nextMonth()"
+        class="w-5 h-4 flex items-center justify-center rounded transition-colors"
+        style="color: #666"
+        onmouseover="this.style.color='#bbb'"
+        onmouseout="this.style.color='#666'">
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Grid ─────────────────────────────────────────────────────────── -->
+  <div class="px-3 pb-4">
+
+    <!-- Cabecera días de semana -->
+    <div class="grid grid-cols-7 mb-1">
+      <div *ngFor="let h of dayHeaders"
+        class="flex items-center justify-center py-1 text-xs font-semibold"
+        style="color: #555">
+        {{ h }}
+      </div>
+    </div>
+
+    <!-- Celdas del mes -->
+    <div class="grid grid-cols-7 gap-y-0.5">
+      <div *ngFor="let cell of cells()"
+        (click)="selectCell(cell)"
+        class="flex items-center justify-center h-9 cursor-pointer rounded-full text-sm transition-colors relative"
+        [style.color]="cell.isSelected ? '#fff' : cell.isCurrentMonth ? '#d0d0d0' : '#444'"
+        [style.background]="cell.isSelected ? '#29b6f6' : 'transparent'"
+        [style.fontWeight]="cell.isToday ? '700' : '400'"
+        onmouseover="if (!this.dataset.selected && !this.dataset.today) this.style.background='rgba(255,255,255,0.06)'"
+        onmouseout="if (!this.dataset.selected) this.style.background= this.dataset.today && !this.dataset.selected ? 'transparent' : 'transparent'"
+        [attr.data-selected]="cell.isSelected || null"
+        [attr.data-today]="cell.isToday || null">
+
+        <!-- Anillo para el día de hoy (cuando no está seleccionado) -->
+        <span *ngIf="cell.isToday && !cell.isSelected"
+          class="absolute inset-0 rounded-full"
+          style="border: 1.5px solid #29b6f6; opacity: 0.7"></span>
+
+        {{ cell.dayNum }}
+      </div>
+    </div>
+
+  </div>
+</div>

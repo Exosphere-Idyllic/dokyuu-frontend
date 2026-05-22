@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
@@ -6,11 +6,12 @@ import { FormsModule } from '@angular/forms';
 import { BoardsService, Board } from '../../core/boards/boards.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService, THEMES, Theme, ThemeId } from '../../core/theme/theme.service';
+import { CalendarWidgetComponent } from './calendar-widget/calendar-widget.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CalendarWidgetComponent],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
@@ -20,10 +21,10 @@ export class DashboardComponent implements OnInit {
   themeService = inject(ThemeService);
   router = inject(Router);
 
-  //  Navegación del sidebar 
+  // ─── Navegación del sidebar ───────────────────────────────────────────────
   activeSidebarTab = signal<'boards' | 'settings'>('boards');
 
-  //  Board Signals 
+  // ─── Board Signals ────────────────────────────────────────────────────────
   hostBoards = signal<Board[]>([]);
   guestBoards = signal<any[]>([]);
 
@@ -31,7 +32,7 @@ export class DashboardComponent implements OnInit {
   showJoinModal = signal(false);
   showEditModal = signal(false);
 
-  //  Profile Modal 
+  // ─── Profile Modal ────────────────────────────────────────────────────────
   showProfileModal = signal(false);
   profileName = '';
   profileColor = '#00F0FF';
@@ -44,7 +45,7 @@ export class DashboardComponent implements OnInit {
     '#14B8A6', '#06B6D4', '#6366F1', '#F43F5E',
   ];
 
-  //  Theme 
+  // ─── Theme ────────────────────────────────────────────────────────────────
   readonly themes: Theme[] = THEMES;
 
   newTitle = '';
@@ -57,17 +58,29 @@ export class DashboardComponent implements OnInit {
 
   loading = signal(false);
 
+  // ─── Calendar ─────────────────────────────────────────────────────────────
+  showCalendar = signal(false);
+  calendarAnchorRect?: DOMRect;
+  @ViewChild('calendarBtn') calendarBtnRef!: ElementRef<HTMLButtonElement>;
+
+  toggleCalendar() {
+    if (!this.showCalendar()) {
+      this.calendarAnchorRect = this.calendarBtnRef.nativeElement.getBoundingClientRect();
+    }
+    this.showCalendar.update(v => !v);
+  }
+
   ngOnInit() {
     this.titleService.setTitle('Dokyuu — Panel');
     this.fetchBoards();
   }
 
-  //  Sidebar nav 
+  // ─── Sidebar nav ──────────────────────────────────────────────────────────
   setTab(tab: 'boards' | 'settings') {
     this.activeSidebarTab.set(tab);
   }
 
-  //  Themes 
+  // ─── Themes ───────────────────────────────────────────────────────────────
   selectTheme(id: ThemeId) {
     this.themeService.setTheme(id);
   }
@@ -76,7 +89,7 @@ export class DashboardComponent implements OnInit {
     return this.themeService.currentTheme() === id;
   }
 
-  //  Boards 
+  // ─── Boards ───────────────────────────────────────────────────────────────
   fetchBoards() {
     this.boardsService.getBoards().subscribe({
       next: (boards: any[]) => {
