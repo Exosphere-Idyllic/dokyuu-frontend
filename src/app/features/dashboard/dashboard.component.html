@@ -93,13 +93,15 @@
   </aside>
 
   <!-- ═══ CALENDAR WIDGET ═══ -->
-  <app-calendar-widget
-    *ngIf="showCalendar()"
-    [anchorRect]="calendarAnchorRect"
-    (close)="showCalendar.set(false)"
-    (openCreate)="showCreateModal.set(true)"
-    (openJoin)="showJoinModal.set(true)">
-  </app-calendar-widget>
+<app-calendar-widget
+  *ngIf="showCalendar()"
+  [anchorRect]="calendarAnchorRect"
+  [allBoards]="hostBoards().concat(guestBoards())"
+  (close)="showCalendar.set(false)"
+  (openCreate)="showCreateModal.set(true)"
+  (openJoin)="showJoinModal.set(true)"
+  (navigateToBoard)="openBoard($event)">
+</app-calendar-widget>
 
   <!-- ═══ MAIN CONTENT ═══ -->
   <main

@@ -5,12 +5,20 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-interface CalendarCell {
+export interface CalendarCell {
   date: Date;
   dayNum: number;
   isToday: boolean;
   isSelected: boolean;
   isCurrentMonth: boolean;
+  hasEvents: boolean;
+}
+
+export interface DateEvent {
+  id: string;
+  type: 'note' | 'board';
+  text: string;
+  boardId?: string;
 }
 
 const DAY_HEADERS = ['LU', 'MA', 'MI', 'JU', 'VI', 'SA', 'DO'];
@@ -30,20 +38,25 @@ const DAY_NAMES = [
 })
 export class CalendarWidgetComponent implements OnInit, OnDestroy {
   @Input() anchorRect?: DOMRect;
+  @Input() allBoards: any[] = [];
+
   @Output() close       = new EventEmitter<void>();
   @Output() openCreate  = new EventEmitter<void>();
   @Output() openJoin    = new EventEmitter<void>();
+  @Output() navigateToBoard = new EventEmitter<string>();
 
   readonly dayHeaders = DAY_HEADERS;
+  private readonly STORAGE_KEY = 'dokyuu_calendar_events';
 
   // ─── View mode ───────────────────────────────────────────────────────────
   viewMode = signal<'monthly' | 'weekly'>('monthly');
 
   // ─── Panels ──────────────────────────────────────────────────────────────
-  showSettings = signal(false);
-  showNewEvent = signal(false);
+  showSettings  = signal(false);
+  showNewEvent  = signal(false);
+  showEventPanel = signal(false);
 
-  // ─── Today override (settings panel) ─────────────────────────────────────
+  // ─── Today override ──────────────────────────────────────────────────────
   customToday      = signal<Date | null>(null);
   todayOverrideInput = '';
   effectiveToday   = computed(() => this.customToday() ?? new Date());
@@ -53,80 +66,102 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
   viewYear     = signal(new Date().getFullYear());
   selectedDate = signal<Date>(new Date());
 
+  // ─── Events storage ──────────────────────────────────────────────────────
+  private eventsMap = signal<Record<string, DateEvent[]>>({});
+
+  selectedDateEvents = computed<DateEvent[]>(() => {
+    const key = this.selectedDateKey();
+    return this.eventsMap()[key] ?? [];
+  });
+
+  eventDatesSet = computed<Set<string>>(() => {
+    const map = this.eventsMap();
+    return new Set(Object.keys(map).filter(k => (map[k]?.length ?? 0) > 0));
+  });
+
+  selectedDateKey = computed(() => {
+    const d = this.selectedDate();
+    return this.dateToKey(d);
+  });
+
+  // ─── Board picker ────────────────────────────────────────────────────────
+  showBoardPicker = signal(false);
+  newNoteText = '';
+
   // ─── Position & size ─────────────────────────────────────────────────────
   posX  = signal(0);
   posY  = signal(0);
-  width = signal(340);
 
   // ─── Drag ────────────────────────────────────────────────────────────────
   private dragging    = false;
   private dragOffsetX = 0;
   private dragOffsetY = 0;
 
-  // ─── Interval for today-dot refresh ─────────────────────────────────────
+  // ─── Interval ────────────────────────────────────────────────────────────
   private tickInterval: any;
 
-  // ─── 42-cell monthly grid ────────────────────────────────────────────────
+  // ─── Calendar grid ───────────────────────────────────────────────────────
   cells = computed<CalendarCell[]>(() => {
     const m     = this.viewMonth();
     const y     = this.viewYear();
     const sel   = this.selectedDate();
     const today = this.effectiveToday();
+    const evts  = this.eventDatesSet();
 
     const firstDay    = new Date(y, m, 1);
-    const startDow    = (firstDay.getDay() + 6) % 7; // Monday = 0
+    const startDow    = (firstDay.getDay() + 6) % 7;
     const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const daysInPrev  = new Date(y, m,     0).getDate();
+    const daysInPrev  = new Date(y, m, 0).getDate();
 
     const cells: CalendarCell[] = [];
 
-    // Leading days from previous month
     for (let i = startDow - 1; i >= 0; i--) {
       const date = new Date(y, m - 1, daysInPrev - i);
-      cells.push({ date, dayNum: date.getDate(), isToday: false, isSelected: false, isCurrentMonth: false });
+      cells.push({ date, dayNum: date.getDate(), isToday: false, isSelected: false, isCurrentMonth: false, hasEvents: false });
     }
 
-    // Current month
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(y, m, d);
+      const key  = this.dateToKey(date);
       cells.push({
         date,
         dayNum: d,
-        isToday:         date.toDateString() === today.toDateString(),
-        isSelected:      date.toDateString() === sel.toDateString(),
-        isCurrentMonth:  true,
+        isToday:        date.toDateString() === today.toDateString(),
+        isSelected:     date.toDateString() === sel.toDateString(),
+        isCurrentMonth: true,
+        hasEvents:      evts.has(key),
       });
     }
 
-    // Trailing days to fill to 42
     let next = 1;
     while (cells.length < 42) {
       const date = new Date(y, m + 1, next++);
-      cells.push({ date, dayNum: date.getDate(), isToday: false, isSelected: false, isCurrentMonth: false });
+      cells.push({ date, dayNum: date.getDate(), isToday: false, isSelected: false, isCurrentMonth: false, hasEvents: false });
     }
 
     return cells;
   });
 
-  // ─── Weekly view: 7 days of the selected date's week ─────────────────────
   weekCells = computed<CalendarCell[]>(() => {
     const sel   = this.selectedDate();
     const today = this.effectiveToday();
+    const evts  = this.eventDatesSet();
 
-    // Start from Monday of selected date's week
     const start = new Date(sel);
-    const dow   = (start.getDay() + 6) % 7; // Mon=0
+    const dow   = (start.getDay() + 6) % 7;
     start.setDate(start.getDate() - dow);
 
     const cells: CalendarCell[] = [];
     for (let i = 0; i < 7; i++) {
       const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const key  = this.dateToKey(date);
       cells.push({
         date,
         dayNum:         date.getDate(),
         isToday:        date.toDateString() === today.toDateString(),
         isSelected:     date.toDateString() === sel.toDateString(),
         isCurrentMonth: date.getMonth() === sel.getMonth(),
+        hasEvents:      evts.has(key),
       });
     }
     return cells;
@@ -141,12 +176,22 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
   monthLabel = computed(() => MONTH_NAMES[this.viewMonth()]);
   yearLabel  = computed(() => this.viewYear().toString());
 
+  availableBoardsToLink = computed(() => {
+    const linked = new Set(
+      this.selectedDateEvents()
+        .filter(e => e.type === 'board')
+        .map(e => e.boardId)
+    );
+    return this.allBoards.filter(b => !linked.has(b._id));
+  });
+
   // ─── Lifecycle ───────────────────────────────────────────────────────────
   ngOnInit() {
-    this.posX.set(Math.max(0, (window.innerWidth  - this.width()) / 2));
+    this.posX.set(Math.max(0, (window.innerWidth  - 340) / 2));
     this.posY.set(Math.max(0, (window.innerHeight - 530) / 2));
 
-    // Refresh "today" dot every minute
+    this.loadEventsFromStorage();
+
     this.tickInterval = setInterval(() => {
       if (!this.customToday()) {
         this.viewMonth.update(m => m);
@@ -156,6 +201,61 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.tickInterval);
+  }
+
+  // ─── Storage helpers ─────────────────────────────────────────────────────
+  private loadEventsFromStorage() {
+    try {
+      const raw = localStorage.getItem(this.STORAGE_KEY);
+      this.eventsMap.set(raw ? JSON.parse(raw) : {});
+    } catch {
+      this.eventsMap.set({});
+    }
+  }
+
+  private persistEvents() {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.eventsMap()));
+    } catch {}
+  }
+
+  private dateToKey(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  // ─── Event mutations ─────────────────────────────────────────────────────
+  addNote() {
+    const text = this.newNoteText.trim();
+    if (!text) return;
+    const key = this.selectedDateKey();
+    const existing = this.eventsMap()[key] ?? [];
+    const newEvent: DateEvent = { id: Date.now().toString(), type: 'note', text };
+    this.eventsMap.update(m => ({ ...m, [key]: [...existing, newEvent] }));
+    this.persistEvents();
+    this.newNoteText = '';
+  }
+
+  removeEvent(eventId: string) {
+    const key = this.selectedDateKey();
+    this.eventsMap.update(m => ({
+      ...m,
+      [key]: (m[key] ?? []).filter(e => e.id !== eventId)
+    }));
+    this.persistEvents();
+  }
+
+  linkBoard(board: any) {
+    const key = this.selectedDateKey();
+    const existing = this.eventsMap()[key] ?? [];
+    const newEvent: DateEvent = {
+      id: `board-${board._id}-${Date.now()}`,
+      type: 'board',
+      text: board.name,
+      boardId: board._id
+    };
+    this.eventsMap.update(m => ({ ...m, [key]: [...existing, newEvent] }));
+    this.persistEvents();
+    this.showBoardPicker.set(false);
   }
 
   // ─── View mode ───────────────────────────────────────────────────────────
@@ -183,8 +283,10 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
       this.viewMonth.set(cell.date.getMonth());
       this.viewYear.set(cell.date.getFullYear());
     }
-    this.showNewEvent.set(true);
+    this.showNewEvent.set(false);
     this.showSettings.set(false);
+    this.showBoardPicker.set(false);
+    this.showEventPanel.set(true);
   }
 
   // ─── New Event panel ─────────────────────────────────────────────────────
@@ -195,6 +297,13 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
 
   closeNewEvent() {
     this.showNewEvent.set(false);
+  }
+
+  toggleEventPanel() {
+    this.showEventPanel.update(v => !v);
+    if (!this.showEventPanel()) {
+      this.showBoardPicker.set(false);
+    }
   }
 
   // ─── Settings panel ──────────────────────────────────────────────────────
@@ -222,15 +331,12 @@ export class CalendarWidgetComponent implements OnInit, OnDestroy {
   resetToday() {
     this.customToday.set(null);
     const t  = new Date();
-    const yy = t.getFullYear();
-    const mm = String(t.getMonth() + 1).padStart(2, '0');
-    const dd = String(t.getDate()).padStart(2, '0');
-    this.todayOverrideInput = `${yy}-${mm}-${dd}`;
+    this.todayOverrideInput = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
   }
 
   // ─── Drag ────────────────────────────────────────────────────────────────
   onDragStart(e: MouseEvent) {
-    if ((e.target as HTMLElement).closest('button, input, select')) return;
+    if ((e.target as HTMLElement).closest('button, input, select, textarea')) return;
     this.dragging    = true;
     this.dragOffsetX = e.clientX - this.posX();
     this.dragOffsetY = e.clientY - this.posY();
