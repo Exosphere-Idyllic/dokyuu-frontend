@@ -32,14 +32,6 @@
             </path>
           </svg>
         </button>
-         <!-- Agendar reunión -->
-      <button #calendarBtn (click)="toggleCalendar()"
-        class="w-full mb-3 text-xs px-3 py-2 transition-all uppercase tracking-widest font-semibold"
-        [style.background]="showCalendar() ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'var(--color-border)'"
-        [style.color]="showCalendar() ? 'var(--color-accent)' : 'var(--color-text-muted)'"
-        [style.border]="showCalendar() ? '1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)' : '1px solid var(--color-border)'">
-        Agendar reunión
-      </button>
       </nav>
     </div>
 
@@ -62,6 +54,20 @@
             {{ authService.currentUser()?.email }}
           </div>
         </div>
+        <button #calendarBtn (click)="toggleCalendar()"
+          class="flex-shrink-0 p-2 transition-colors hover:bg-white/10 text-white/60 hover:text-white"
+          [style.background]="showCalendar() ? 'color-mix(in srgb, var(--color-accent) 20%, transparent)' : 'transparent'"
+          [style.color]="showCalendar() ? 'var(--color-accent)' : 'var(--color-text-muted)'"
+          [style.border]="showCalendar() ? '1px solid color-mix(in srgb, var(--color-accent) 40%, transparent)' : '1px solid transparent'"
+          style="border-radius: 50% !important;"
+          title="Ver Calendario">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </button>
       </div>
 
       <button (click)="openProfileModal()"
@@ -90,7 +96,9 @@
   <app-calendar-widget
     *ngIf="showCalendar()"
     [anchorRect]="calendarAnchorRect"
-    (close)="showCalendar.set(false)">
+    (close)="showCalendar.set(false)"
+    (openCreate)="showCreateModal.set(true)"
+    (openJoin)="showJoinModal.set(true)">
   </app-calendar-widget>
 
   <!-- ═══ MAIN CONTENT ═══ -->
@@ -257,6 +265,62 @@
           <p class="text-sm font-semibold" style="color: var(--color-text)">{{ theme.name }}</p>
           <p class="text-[11px] mt-0.5" style="color: var(--color-text-muted)">{{ theme.description }}</p>
         </button>
+      </div>
+
+      <!-- Divider -->
+      <div class="my-10 h-px" style="background-color: var(--color-border)"></div>
+
+      <!-- Timezone & Time Config -->
+      <div class="mb-10">
+        <p class="text-xs uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Tiempo Global</p>
+        <h1 class="text-3xl font-semibold" style="color: var(--color-text)">Zona Horaria y Sincronización</h1>
+        <p class="mt-2 text-sm" style="color: var(--color-text-muted)">
+          Sincroniza y muestra la hora de cualquier región del mundo usando la API de Tiempo.
+        </p>
+      </div>
+
+      <div class="p-6 border flex flex-col gap-6"
+        style="background-color: var(--color-surface); border-color: var(--color-border); border-radius: 16px !important;">
+        
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-semibold uppercase tracking-wider block"
+            style="color: var(--color-text-muted)">Seleccionar Zona Horaria</label>
+          <select 
+            [ngModel]="selectedTimezone()" 
+            (ngModelChange)="onTimezoneChange($event)"
+            class="input-primary w-full max-w-md py-2.5 px-3 cursor-pointer outline-none font-sans"
+            style="border-radius: 8px !important;">
+            <option *ngFor="let tz of TIMEZONES" [value]="tz">{{ tz }}</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-8 py-2">
+          <div class="flex flex-col">
+            <span class="text-xs uppercase tracking-widest font-bold" style="color: var(--color-text-muted)">Hora de la Zona</span>
+            <div class="flex items-center gap-3 mt-1">
+              <span class="text-4xl font-black font-mono tracking-tight" style="color: var(--color-text)">
+                {{ timezoneTime() || '--:--:--' }}
+              </span>
+              <span *ngIf="timezoneLoading()" class="flex h-3 w-3 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
+              </span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2 justify-center">
+            <span class="text-xs uppercase tracking-widest font-bold" style="color: var(--color-text-muted)">Formato</span>
+            <button 
+              (click)="toggleTimeFormat()" 
+              class="px-4 py-2 text-xs font-bold transition-all"
+              [style.background]="use24h() ? 'var(--color-accent)' : 'var(--color-border)'"
+              [style.color]="use24h() ? 'var(--color-bg)' : 'var(--color-text)'"
+              style="border-radius: 8px !important;">
+              {{ use24h() ? 'Formato 24h' : 'Formato 12h' }}
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </main>

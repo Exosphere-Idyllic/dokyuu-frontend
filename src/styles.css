@@ -119,3 +119,30 @@
     border-color: var(--color-accent);
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   CUSTOM CALENDAR STYLES
+   ═══════════════════════════════════════════════════════ */
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.cal-fade-in {
+  animation: calFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes calFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

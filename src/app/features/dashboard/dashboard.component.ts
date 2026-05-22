@@ -1,8 +1,9 @@
-import { Component, inject, signal, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { BoardsService, Board } from '../../core/boards/boards.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService, THEMES, Theme, ThemeId } from '../../core/theme/theme.service';
@@ -14,12 +15,36 @@ import { CalendarWidgetComponent } from './calendar-widget/calendar-widget.compo
   imports: [CommonModule, FormsModule, CalendarWidgetComponent],
   templateUrl: './dashboard.component.html',
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private titleService = inject(Title);
+  private http = inject(HttpClient);
   boardsService = inject(BoardsService);
   authService = inject(AuthService);
   themeService = inject(ThemeService);
   router = inject(Router);
+
+  // ─── Timezone Config & Time API ───────────────────────────────────────────
+  readonly TIMEZONES = [
+    'UTC', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Lagos',
+    'America/Anchorage', 'America/Argentina/Buenos_Aires', 'America/Bogota',
+    'America/Caracas', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+    'America/Mexico_City', 'America/New_York', 'America/Phoenix',
+    'America/Santiago', 'America/Sao_Paulo', 'Asia/Bangkok', 'Asia/Dubai',
+    'Asia/Hong_Kong', 'Asia/Istanbul', 'Asia/Jakarta', 'Asia/Jerusalem',
+    'Asia/Kolkata', 'Asia/Manila', 'Asia/Riyadh', 'Asia/Seoul', 'Asia/Shanghai',
+    'Asia/Singapore', 'Asia/Tokyo', 'Australia/Adelaide', 'Australia/Brisbane',
+    'Australia/Melbourne', 'Australia/Sydney', 'Europe/Amsterdam', 'Europe/Berlin',
+    'Europe/Brussels', 'Europe/Dublin', 'Europe/Lisbon', 'Europe/London',
+    'Europe/Madrid', 'Europe/Paris', 'Europe/Rome', 'Europe/Vienna',
+    'Europe/Warsaw', 'Europe/Zurich', 'Pacific/Auckland', 'Pacific/Honolulu'
+  ];
+
+  selectedTimezone = signal<string>('UTC');
+  use24h = signal<boolean>(true);
+  timezoneTime = signal<string>('');
+  timezoneLoading = signal<boolean>(false);
+  private timezoneOffsetMs = 0;
+  private timezoneInterval: any;
 
   // ─── Navegación del sidebar ───────────────────────────────────────────────
   activeSidebarTab = signal<'boards' | 'settings'>('boards');
@@ -73,6 +98,80 @@ export class DashboardComponent implements OnInit {
   ngOnInit() {
     this.titleService.setTitle('Dokyuu — Panel');
     this.fetchBoards();
+
+    // Detect timezone
+    try {
+      const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (this.TIMEZONES.includes(userTz)) {
+        this.selectedTimezone.set(userTz);
+      } else {
+        const matched = this.TIMEZONES.find(tz => tz.split('/')[1] === userTz.split('/')[1]);
+        if (matched) this.selectedTimezone.set(matched);
+      }
+    } catch (e) {}
+
+    this.fetchTimezoneTime(this.selectedTimezone());
+
+    // Local tick interval
+    this.timezoneInterval = setInterval(() => {
+      this.updateTimezoneClock();
+    }, 1000);
+  }
+
+  ngOnDestroy() {
+    if (this.timezoneInterval) {
+      clearInterval(this.timezoneInterval);
+    }
+  }
+
+  // ─── Timezone clock methods ────────────────────────────────────────────────
+  onTimezoneChange(newTz: string) {
+    this.selectedTimezone.set(newTz);
+    this.fetchTimezoneTime(newTz);
+  }
+
+  toggleTimeFormat() {
+    this.use24h.update(v => !v);
+    this.updateTimezoneClock();
+  }
+
+  private fetchTimezoneTime(tz: string) {
+    this.timezoneLoading.set(true);
+    this.http.get<any>(`https://timeapi.io/api/time/current/zone?timeZone=${encodeURIComponent(tz)}`).subscribe({
+      next: (res) => {
+        if (res && res.dateTime) {
+          const apiTime = new Date(res.dateTime);
+          const localTime = new Date();
+          if (!isNaN(apiTime.getTime())) {
+            this.timezoneOffsetMs = apiTime.getTime() - localTime.getTime();
+          }
+        }
+        this.updateTimezoneClock();
+        this.timezoneLoading.set(false);
+      },
+      error: (err) => {
+        console.error('Error fetching timezone from API, falling back to local offset:', err);
+        this.timezoneOffsetMs = 0;
+        this.updateTimezoneClock();
+        this.timezoneLoading.set(false);
+      }
+    });
+  }
+
+  private updateTimezoneClock() {
+    const time = new Date(Date.now() + this.timezoneOffsetMs);
+    try {
+      const formatted = new Intl.DateTimeFormat('es-ES', {
+        timeZone: this.selectedTimezone(),
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: !this.use24h(),
+      }).format(time);
+      this.timezoneTime.set(formatted);
+    } catch (e) {
+      this.timezoneTime.set(time.toLocaleTimeString());
+    }
   }
 
   // ─── Sidebar nav ──────────────────────────────────────────────────────────
