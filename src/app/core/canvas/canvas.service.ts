@@ -192,7 +192,7 @@ export class CanvasService {
 
   sendChatMessage(boardId: string, message: string) {
     if (this.socket?.connected) {
-      this.socket.emit('chat:send', { boardId, message });
+      this.socket.emit('chat:message', { boardId, message });
     }
   }
 
