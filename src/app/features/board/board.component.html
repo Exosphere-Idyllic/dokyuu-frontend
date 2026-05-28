@@ -590,4 +590,81 @@
       {{ notif.message }}
     </div>
   </div>
+
+  <!-- UI: Mini-Mapa Interactivo -->
+  <div *ngIf="showMinimap"
+    class="fixed bottom-4 right-4 z-50 flex flex-col bg-[#0A0A0C]/85 backdrop-blur border border-white/10 p-1 pointer-events-auto select-none shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300">
+    
+    <!-- Header del Mini-Mapa -->
+    <div class="flex items-center justify-between px-2 py-1 border-b border-white/10 mb-1 bg-black/40">
+      <span class="text-[9px] font-mono font-bold tracking-widest text-white uppercase flex items-center gap-1.5">
+        <span class="w-1.5 h-1.5 bg-neonBlue animate-pulse"></span>
+        Radar Pizarra
+      </span>
+      <button (click)="showMinimap = false" class="text-gray-400 hover:text-white text-[10px] font-bold px-1 transition-colors uppercase tracking-wider cursor-pointer">
+        Ocultar
+      </button>
+    </div>
+
+    <!-- Contenedor del Mapa -->
+    <div class="minimap-container relative overflow-hidden select-none bg-black/60 border border-white/5 cursor-crosshair"
+      [style.width.px]="minimapWidth"
+      [style.height.px]="minimapHeight"
+      (mousedown)="onMinimapMouseDown($event)"
+      (mousemove)="onMinimapMouseMove($event)"
+      (mouseup)="onMinimapMouseUp()">
+      
+      <svg class="w-full h-full" [attr.viewBox]="'0 0 ' + minimapWidth + ' ' + minimapHeight">
+        <!-- Renderizar miniaturas de elementos -->
+        <g *ngFor="let el of getMinimapElements()">
+          <!-- Nota adhesiva -->
+          <rect *ngIf="el.type === 'note'"
+            [attr.x]="el.x" [attr.y]="el.y"
+            [attr.width]="el.w" [attr.height]="el.h"
+            [attr.fill]="el.color" fill-opacity="0.85"
+            stroke="white" stroke-opacity="0.15" stroke-width="1"
+            [attr.transform]="'rotate(' + el.rotation + ' ' + (el.x + el.w/2) + ' ' + (el.y + el.h/2) + ')'" />
+            
+          <!-- Forma: Círculo -->
+          <circle *ngIf="el.type === 'shape' && el.shapeType === 'circle'"
+            [attr.cx]="el.x + el.w/2" [attr.cy]="el.y + el.h/2"
+            [attr.r]="el.w/2"
+            [attr.fill]="el.color" fill-opacity="0.75"
+            stroke="white" stroke-opacity="0.2" stroke-width="1"
+            [attr.transform]="'rotate(' + el.rotation + ' ' + (el.x + el.w/2) + ' ' + (el.y + el.h/2) + ')'" />
+
+          <!-- Forma: Rectángulo/Cuadrado y otros fallbacks -->
+          <rect *ngIf="el.type === 'image' || (el.type === 'shape' && el.shapeType !== 'circle' && el.shapeType !== 'line' && el.shapeType !== 'arrow')"
+            [attr.x]="el.x" [attr.y]="el.y"
+            [attr.width]="el.w" [attr.height]="el.h"
+            [attr.fill]="el.type === 'image' ? 'rgba(255,255,255,0.2)' : el.color" fill-opacity="0.7"
+            stroke="white" stroke-opacity="0.15" stroke-width="1"
+            [attr.transform]="'rotate(' + el.rotation + ' ' + (el.x + el.w/2) + ' ' + (el.y + el.h/2) + ')'" />
+            
+          <!-- Forma: Línea o Flecha -->
+          <line *ngIf="el.type === 'shape' && (el.shapeType === 'line' || el.shapeType === 'arrow')"
+            [attr.x1]="el.x" [attr.y1]="el.y"
+            [attr.x2]="el.x + el.w" [attr.y2]="el.y + el.h"
+            [attr.stroke]="el.color" stroke-width="1.5" stroke-opacity="0.8" />
+        </g>
+
+        <!-- Viewport actual (Rectángulo de visualización) -->
+        <rect
+          [attr.x]="getMinimapViewport().x"
+          [attr.y]="getMinimapViewport().y"
+          [attr.width]="getMinimapViewport().w"
+          [attr.height]="getMinimapViewport().h"
+          fill="none"
+          stroke="var(--color-accent)"
+          stroke-width="1.5"
+          style="filter: drop-shadow(0 0 2px var(--color-accent)); opacity: 0.85;" />
+      </svg>
+    </div>
+  </div>
+
+  <!-- Botón pequeño para reabrir el Mini-Mapa si está oculto -->
+  <button *ngIf="!showMinimap" (click)="showMinimap = true"
+    class="fixed bottom-4 right-4 z-50 bg-[#0A0A0C]/90 hover:bg-white/5 border border-neonBlue/40 text-neonBlue text-[9px] font-bold tracking-widest uppercase py-2 px-3 transition-colors pointer-events-auto cursor-pointer">
+    🛰️ Mostrar Radar
+  </button>
 </div>

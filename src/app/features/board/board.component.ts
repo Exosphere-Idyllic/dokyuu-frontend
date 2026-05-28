@@ -68,6 +68,12 @@ export class BoardComponent implements OnInit, OnDestroy {
   zoom = 1;
 
   isZoomingUiVisible = false;
+
+  // --- Mini-map state ---
+  showMinimap = true;
+  minimapWidth = 200;
+  minimapHeight = 120;
+  isDraggingMinimap = false;
   private zoomTimeout: any;
 
   ngOnInit() {
@@ -290,6 +296,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   @HostListener('mouseup')
   onMouseUp() {
     this.isPanning = false;
+    this.isDraggingMinimap = false;
 
     if (this.resizingId) {
       this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
@@ -528,5 +535,135 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.zoom = newZoom;
 
     this.showZoomUi();
+  }
+
+  // ─── Lógica de Mini-Mapa ──────────────────────────────────────────────────
+  
+  getMinimapBounds() {
+    const elements = this.canvasService.elements() || [];
+    
+    // Vista actual del viewport
+    const viewportX = -this.panX / this.zoom;
+    const viewportY = -this.panY / this.zoom;
+    const viewportW = window.innerWidth / this.zoom;
+    const viewportH = window.innerHeight / this.zoom;
+
+    let minX = viewportX;
+    let maxX = viewportX + viewportW;
+    let minY = viewportY;
+    let maxY = viewportY + viewportH;
+
+    // Expandir límites según los elementos en el canvas
+    elements.forEach(el => {
+      const w = el.type === 'note' ? 250 : (el.width || 100);
+      const h = el.type === 'note' ? 144 : (el.height || 100);
+      if (el.x < minX) minX = el.x;
+      if (el.x + w > maxX) maxX = el.x + w;
+      if (el.y < minY) minY = el.y;
+      if (el.y + h > maxY) maxY = el.y + h;
+    });
+
+    // Agregar un margen (padding) de 300px
+    minX -= 300;
+    minY -= 300;
+    maxX += 300;
+    maxY += 300;
+
+    // Asegurar tamaño mínimo del mundo para evitar división por cero
+    const width = maxX - minX;
+    const height = maxY - minY;
+    const minSize = 2500;
+    
+    if (width < minSize) {
+      const center = (minX + maxX) / 2;
+      minX = center - minSize / 2;
+      maxX = center + minSize / 2;
+    }
+    if (height < (minSize * 0.6)) {
+      const center = (minY + maxY) / 2;
+      minY = center - (minSize * 0.6) / 2;
+      maxY = center + (minSize * 0.6) / 2;
+    }
+
+    return {
+      minX,
+      maxX,
+      minY,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY,
+      viewportX,
+      viewportY,
+      viewportW,
+      viewportH
+    };
+  }
+
+  getMinimapElements() {
+    const bounds = this.getMinimapBounds();
+    const elements = this.canvasService.elements() || [];
+    
+    return elements.map(el => {
+      const w = el.type === 'note' ? 250 : (el.width || 100);
+      const h = el.type === 'note' ? 144 : (el.height || 100);
+      return {
+        id: el.id,
+        type: el.type,
+        shapeType: el.shapeType,
+        color: el.color,
+        x: ((el.x - bounds.minX) / bounds.width) * this.minimapWidth,
+        y: ((el.y - bounds.minY) / bounds.height) * this.minimapHeight,
+        w: (w / bounds.width) * this.minimapWidth,
+        h: (h / bounds.height) * this.minimapHeight,
+        rotation: el.rotation || 0
+      };
+    });
+  }
+
+  getMinimapViewport() {
+    const bounds = this.getMinimapBounds();
+    return {
+      x: ((bounds.viewportX - bounds.minX) / bounds.width) * this.minimapWidth,
+      y: ((bounds.viewportY - bounds.minY) / bounds.height) * this.minimapHeight,
+      w: (bounds.viewportW / bounds.width) * this.minimapWidth,
+      h: (bounds.viewportH / bounds.height) * this.minimapHeight
+    };
+  }
+
+  onMinimapMouseDown(e: MouseEvent) {
+    e.stopPropagation();
+    this.isDraggingMinimap = true;
+    this.panToMinimapPoint(e);
+  }
+
+  onMinimapMouseMove(e: MouseEvent) {
+    if (this.isDraggingMinimap) {
+      e.stopPropagation();
+      this.panToMinimapPoint(e);
+    }
+  }
+
+  onMinimapMouseUp() {
+    this.isDraggingMinimap = false;
+  }
+
+  private panToMinimapPoint(e: MouseEvent) {
+    const minimapElement = document.querySelector('.minimap-container');
+    if (!minimapElement) return;
+
+    const rect = minimapElement.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const percentX = Math.min(Math.max(0, clickX / this.minimapWidth), 1);
+    const percentY = Math.min(Math.max(0, clickY / this.minimapHeight), 1);
+
+    const bounds = this.getMinimapBounds();
+    const worldX = bounds.minX + percentX * bounds.width;
+    const worldY = bounds.minY + percentY * bounds.height;
+
+    // Centrar la cámara en la coordenada seleccionada
+    this.panX = window.innerWidth / 2 - worldX * this.zoom;
+    this.panY = window.innerHeight / 2 - worldY * this.zoom;
   }
 }
