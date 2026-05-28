@@ -16,6 +16,7 @@ export interface BoardElement {
   height?: number;
   shapeType?: 'square' | 'circle' | 'triangle' | 'arrow' | 'line';
   rotation?: number;
+  layer?: number;
 }
 
 export interface CursorPosition {

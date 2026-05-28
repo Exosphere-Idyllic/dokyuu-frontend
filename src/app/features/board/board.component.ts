@@ -58,7 +58,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   resizeStartH = 0;
   isRotatingId: string | null = null;
 
-  selectedShapeId: string | null = null;
+  selectedElementId: string | null = null;
 
   isPanning = false;
   panX = 0;
@@ -223,7 +223,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.isPanning = true;
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
-      this.selectedShapeId = null;
+      this.selectedElementId = null;
     }
   }
 
@@ -435,6 +435,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.draggingId = note.id;
     this.dragOffsetX = ((e.clientX - this.panX) / this.zoom) - note.x;
     this.dragOffsetY = ((e.clientY - this.panY) / this.zoom) - note.y;
+    this.selectedElementId = note.id;
   }
 
   updateContent(note: BoardElement, newContent: string) {
@@ -446,15 +447,41 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   deleteNote(id: string) {
-    if (this.selectedShapeId === id) this.selectedShapeId = null;
+    if (this.selectedElementId === id) this.selectedElementId = null;
     const updated = this.canvasService.elements().filter(n => n.id !== id);
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
   }
 
-  selectShape(e: MouseEvent, note: BoardElement) {
+  selectElement(e: MouseEvent, note: BoardElement) {
     e.stopPropagation();
-    this.selectedShapeId = note.id;
+    this.selectedElementId = note.id;
+  }
+
+  changeLayer(id: string, layer: number) {
+    const updated = this.canvasService.elements().map(el =>
+      el.id === id ? { ...el, layer } : el
+    );
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  copyElement(id: string) {
+    const element = this.canvasService.elements().find(el => el.id === id);
+    if (!element) return;
+
+    const newElement: BoardElement = {
+      ...element,
+      id: Math.random().toString(36).substr(2, 9),
+      x: element.x + 30,
+      y: element.y + 30,
+      createdBy: this.authService.currentUser()?.sub!
+    };
+
+    const updated = [...this.canvasService.elements(), newElement];
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+    this.selectedElementId = newElement.id;
   }
 
   deformShape(id: string, axis: 'wider' | 'taller' | 'reset') {
