@@ -59,6 +59,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   isRotatingId: string | null = null;
 
   selectedElementId: string | null = null;
+  activeSubmenu: 'color' | 'layer' | 'quick' | null = null;
 
   isPanning = false;
   panX = 0;
@@ -224,6 +225,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.lastPanX = e.clientX;
       this.lastPanY = e.clientY;
       this.selectedElementId = null;
+      this.activeSubmenu = null;
     }
   }
 
@@ -435,6 +437,9 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.draggingId = note.id;
     this.dragOffsetX = ((e.clientX - this.panX) / this.zoom) - note.x;
     this.dragOffsetY = ((e.clientY - this.panY) / this.zoom) - note.y;
+    if (this.selectedElementId !== note.id) {
+      this.activeSubmenu = null;
+    }
     this.selectedElementId = note.id;
   }
 
@@ -447,7 +452,10 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   deleteNote(id: string) {
-    if (this.selectedElementId === id) this.selectedElementId = null;
+    if (this.selectedElementId === id) {
+      this.selectedElementId = null;
+      this.activeSubmenu = null;
+    }
     const updated = this.canvasService.elements().filter(n => n.id !== id);
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
@@ -455,6 +463,9 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   selectElement(e: MouseEvent, note: BoardElement) {
     e.stopPropagation();
+    if (this.selectedElementId !== note.id) {
+      this.activeSubmenu = null;
+    }
     this.selectedElementId = note.id;
   }
 
@@ -482,6 +493,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
     this.selectedElementId = newElement.id;
+    this.activeSubmenu = null;
   }
 
   deformShape(id: string, axis: 'wider' | 'taller' | 'reset') {
@@ -510,6 +522,66 @@ export class BoardComponent implements OnInit, OnDestroy {
     });
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
+  }
+
+  toggleSubmenu(menu: 'color' | 'layer' | 'quick') {
+    if (this.activeSubmenu === menu) {
+      this.activeSubmenu = null;
+    } else {
+      this.activeSubmenu = menu;
+    }
+  }
+
+  getSelectedElement(): BoardElement | null {
+    if (!this.selectedElementId) return null;
+    return this.canvasService.elements().find(el => el.id === this.selectedElementId) || null;
+  }
+
+  getSelectedElementDims(el: BoardElement): { w: number, h: number } {
+    if (el.type === 'note') {
+      return { w: 250, h: 152 };
+    } else if (el.type === 'image') {
+      return { w: el.width || 300, h: (el.height || 200) + 24 };
+    } else {
+      return { w: el.width || 100, h: el.height || 100 };
+    }
+  }
+
+  getSelectedElementToolbarPos(): { x: number, y: number } | null {
+    const el = this.getSelectedElement();
+    if (!el) return null;
+
+    const { w, h } = this.getSelectedElementDims(el);
+
+    const cx = el.x + w / 2;
+    const cy = el.y + h / 2;
+
+    const rad = ((el.rotation || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const halfW = w / 2;
+    const halfH = h / 2;
+
+    const corners = [
+      { x: -halfW, y: -halfH },
+      { x: halfW, y: -halfH },
+      { x: halfW, y: halfH },
+      { x: -halfW, y: halfH }
+    ];
+
+    let minY = Infinity;
+    for (const pt of corners) {
+      const rotY = pt.x * sin + pt.y * cos;
+      if (rotY < minY) {
+        minY = rotY;
+      }
+    }
+
+    return {
+      x: cx,
+      y: cy + minY - 15
+    };
   }
 
   goBack() {
