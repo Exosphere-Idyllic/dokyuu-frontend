@@ -324,6 +324,87 @@
         </div>
 
       </div>
+
+      <!-- Divider -->
+      <div class="my-10 h-px" style="background-color: var(--color-border)"></div>
+
+      <!-- Preferencias de UI de la Pizarra -->
+      <div class="mb-10">
+        <p class="text-xs uppercase tracking-widest mb-1" style="color: var(--color-text-muted)">Preferencias de la Pizarra</p>
+        <h1 class="text-3xl font-semibold" style="color: var(--color-text)">Controles de Interfaz</h1>
+        <p class="mt-2 text-sm" style="color: var(--color-text-muted)">
+          Ajusta la visibilidad y comportamiento dinámico del minimapa (radar) y los controles de zoom dentro del lienzo.
+        </p>
+      </div>
+
+      <div class="p-6 border flex flex-col gap-6 mb-10"
+        style="background-color: var(--color-surface); border-color: var(--color-border); border-radius: 16px !important;">
+        
+        <!-- Configuración de Minimapa -->
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-semibold uppercase tracking-wider block"
+            style="color: var(--color-text-muted)">Minimapa (Radar)</label>
+          <div class="flex bg-black/40 p-1 rounded border border-white/5 max-w-md">
+            <button (click)="updateMinimapConfig('active')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="minimapConfig() === 'active' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="minimapConfig() === 'active' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Activo
+            </button>
+            <button (click)="updateMinimapConfig('always')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="minimapConfig() === 'always' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="minimapConfig() === 'always' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Siempre
+            </button>
+            <button (click)="updateMinimapConfig('disabled')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="minimapConfig() === 'disabled' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="minimapConfig() === 'disabled' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Desactivado
+            </button>
+          </div>
+          <p class="text-[11px]" style="color: var(--color-text-muted)">
+            <b>Activo</b>: Se mantiene oculto y aparece temporalmente al acercar el cursor a su zona, usar la rueda del ratón o cambiar el zoom.
+          </p>
+        </div>
+
+        <!-- Configuración de Zoom -->
+        <div class="flex flex-col gap-2">
+          <label class="text-xs font-semibold uppercase tracking-wider block"
+            style="color: var(--color-text-muted)">Controles de Zoom</label>
+          <div class="flex bg-black/40 p-1 rounded border border-white/5 max-w-md">
+            <button (click)="updateZoomConfig('active')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="zoomConfig() === 'active' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="zoomConfig() === 'active' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Activo
+            </button>
+            <button (click)="updateZoomConfig('always')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="zoomConfig() === 'always' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="zoomConfig() === 'always' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Siempre
+            </button>
+            <button (click)="updateZoomConfig('disabled')"
+              class="flex-1 py-2 text-xs font-bold uppercase rounded transition-colors"
+              [style.background]="zoomConfig() === 'disabled' ? 'var(--color-accent)' : 'transparent'"
+              [style.color]="zoomConfig() === 'disabled' ? 'var(--color-bg)' : 'var(--color-text-muted)'"
+              style="border-radius: 6px !important;">
+              Desactivado
+            </button>
+          </div>
+          <p class="text-[11px]" style="color: var(--color-text-muted)">
+            <b>Activo</b>: Se mantiene oculto y aparece temporalmente al acercar el cursor a su zona, usar la rueda del ratón o cambiar el zoom.
+          </p>
+        </div>
+
+      </div>
     </div>
   </main>
 </div>

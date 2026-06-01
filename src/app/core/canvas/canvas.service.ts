@@ -17,6 +17,8 @@ export interface BoardElement {
   shapeType?: 'square' | 'circle' | 'triangle' | 'arrow' | 'line';
   rotation?: number;
   layer?: number;
+  title?: string;
+  minimized?: boolean;
 }
 
 export interface CursorPosition {

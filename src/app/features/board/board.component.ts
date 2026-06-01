@@ -57,6 +57,8 @@ export class BoardComponent implements OnInit, OnDestroy {
   resizeStartW = 0;
   resizeStartH = 0;
   isRotatingId: string | null = null;
+  mouseScreenX = 0;
+  mouseScreenY = 0;
 
   selectedElementId: string | null = null;
   activeSubmenu: 'color' | 'layer' | 'quick' | null = null;
@@ -69,15 +71,37 @@ export class BoardComponent implements OnInit, OnDestroy {
   zoom = 1;
 
   isZoomingUiVisible = false;
+  zoomConfig: 'active' | 'always' | 'disabled' = 'active';
 
   // --- Mini-map state ---
   showMinimap = true;
   minimapWidth = 200;
   minimapHeight = 120;
   isDraggingMinimap = false;
+  isMinimapUiVisible = false;
+  minimapConfig: 'active' | 'always' | 'disabled' = 'active';
   private zoomTimeout: any;
+  private minimapTimeout: any;
+
+  showMinimapUi() {
+    this.isMinimapUiVisible = true;
+    clearTimeout(this.minimapTimeout);
+    this.minimapTimeout = setTimeout(() => {
+      this.isMinimapUiVisible = false;
+    }, 1500);
+  }
 
   ngOnInit() {
+    const storedMinimap = localStorage.getItem('dokyuu_minimap_config');
+    if (storedMinimap === 'active' || storedMinimap === 'always' || storedMinimap === 'disabled') {
+      this.minimapConfig = storedMinimap;
+    }
+
+    const storedZoom = localStorage.getItem('dokyuu_zoom_config');
+    if (storedZoom === 'active' || storedZoom === 'always' || storedZoom === 'disabled') {
+      this.zoomConfig = storedZoom;
+    }
+
     this.boardsService.getBoards().subscribe((boards: any[]) => {
       const currentBoard = boards.find(b => b._id === this.boardId);
       if (currentBoard) {
@@ -231,6 +255,8 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   @HostListener('mousemove', ['$event'])
   onMouseMove(e: MouseEvent) {
+    this.mouseScreenX = e.clientX;
+    this.mouseScreenY = e.clientY;
     this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom });
 
     if (this.isPanning) {
@@ -246,13 +272,15 @@ export class BoardComponent implements OnInit, OnDestroy {
       const updated = current.map(el => {
         if (el.id === this.isRotatingId) {
           const w = el.type === 'note' ? 250 : (el.width || 100);
-          const h = el.type === 'note' ? 144 : (el.height || 100);
+          const h = el.type === 'note' ? (el.minimized ? 28 : 152) : (el.height || 100);
           const centerX = el.x + w / 2;
           const centerY = el.y + h / 2;
           const mouseX = (e.clientX - this.panX) / this.zoom;
           const mouseY = (e.clientY - this.panY) / this.zoom;
-          let angle = Math.atan2(mouseY - centerY, mouseX - centerX) * (180 / Math.PI);
-          angle = angle + 90;
+          // 90 - atan2: el handle vive en la dirección (sin, cos) del eje local "abajo".
+          // atan2(dy, dx) devuelve 90° cuando el ratón está justo debajo del centro,
+          // por eso 90 - atan2 mapea correctamente: abajo→0°, derecha→90°, arriba→180°, izq→270°.
+          const angle = 90 - Math.atan2(mouseY - centerY, mouseX - centerX) * (180 / Math.PI);
           return { ...el, rotation: angle };
         }
         return el;
@@ -379,6 +407,91 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.isRotatingId = note.id;
   }
 
+  // ─── Geometría exacta en viewport ─────────────────────────────────────────
+
+  /**
+   * Proyecta los 4 vértices del objeto al espacio de pantalla (viewport)
+   * y devuelve sus extremos reales (no AABB del AABB) más el centro.
+   */
+  getElementViewportGeometry(el: BoardElement): {
+    cx: number; cy: number;
+    vertices: { x: number; y: number }[];
+    top: number; bottom: number; left: number; right: number;
+  } {
+    const { w, h } = this.getSelectedElementDims(el);
+    const rad = ((el.rotation || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // Centro del objeto en pantalla
+    const cx = (el.x + w / 2) * this.zoom + this.panX;
+    const cy = (el.y + h / 2) * this.zoom + this.panY;
+
+    // Vértices locales (relativo al centro del objeto en unidades canvas)
+    const localCorners = [
+      { x: -w / 2, y: -h / 2 },
+      { x:  w / 2, y: -h / 2 },
+      { x:  w / 2, y:  h / 2 },
+      { x: -w / 2, y:  h / 2 },
+    ];
+
+    // Proyectar cada vértice al viewport: rotar + escalar por zoom + trasladar al centro pantalla
+    const vertices = localCorners.map(p => ({
+      x: cx + (p.x * cos - p.y * sin) * this.zoom,
+      y: cy + (p.x * sin + p.y * cos) * this.zoom,
+    }));
+
+    const xs = vertices.map(v => v.x);
+    const ys = vertices.map(v => v.y);
+
+    return {
+      cx, cy,
+      vertices,
+      top:    Math.min(...ys),
+      bottom: Math.max(...ys),
+      left:   Math.min(...xs),
+      right:  Math.max(...xs),
+    };
+  }
+
+  /**
+   * Posición del tirador de rotación en viewport.
+   * Siempre se ubica en la parte inferior del bounding box rotado en pantalla.
+   */
+  getRotateHandleScreenPos(el: BoardElement): { x: number; y: number } | null {
+    if (!el) return null;
+    const geo = this.getElementViewportGeometry(el);
+    const HANDLE_GAP = 28; // píxeles de pantalla entre borde del objeto y el handle
+
+    // El handle siempre se ubica en la parte inferior del bounding box en pantalla
+    return {
+      x: Math.max(20, Math.min(geo.cx, window.innerWidth  - 20)),
+      y: Math.max(20, Math.min(geo.bottom + HANDLE_GAP, window.innerHeight - 20)),
+    };
+  }
+
+  getDisplayRotation(el: BoardElement): number {
+    let r = Math.round(el.rotation || 0) % 360;
+    if (r < 0) r += 360;
+    return r;
+  }
+
+  getDegreeBadgeScreenPos(el: BoardElement): { x: number; y: number } | null {
+    if (!el) return null;
+    const geo = this.getElementViewportGeometry(el);
+    const BADGE_H = 24;
+    const BADGE_GAP = 20;
+
+    const x = geo.cx;
+    const y = geo.bottom + BADGE_GAP;
+
+    return {
+      x: Math.max(40, Math.min(x, window.innerWidth - 40)),
+      y: Math.max(60 + BADGE_H, Math.min(y, window.innerHeight - BADGE_H))
+    };
+  }
+
+
   triggerImageUpload() {
     this.uploadError = null;
     this.imageInputRef.nativeElement.value = '';
@@ -446,6 +559,23 @@ export class BoardComponent implements OnInit, OnDestroy {
   updateContent(note: BoardElement, newContent: string) {
     const updated = this.canvasService.elements().map(n =>
       n.id === note.id ? { ...n, content: newContent } : n
+    );
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  updateTitle(note: BoardElement, newTitle: string) {
+    const updated = this.canvasService.elements().map(n =>
+      n.id === note.id ? { ...n, title: newTitle } : n
+    );
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+  }
+
+  toggleMinimizeNote(e: MouseEvent, note: BoardElement) {
+    e.stopPropagation();
+    const updated = this.canvasService.elements().map(n =>
+      n.id === note.id ? { ...n, minimized: !n.minimized } : n
     );
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
@@ -539,7 +669,7 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   getSelectedElementDims(el: BoardElement): { w: number, h: number } {
     if (el.type === 'note') {
-      return { w: 250, h: 152 };
+      return { w: 250, h: el.minimized ? 28 : 152 };
     } else if (el.type === 'image') {
       return { w: el.width || 300, h: (el.height || 200) + 24 };
     } else {
@@ -547,41 +677,22 @@ export class BoardComponent implements OnInit, OnDestroy {
     }
   }
 
-  getSelectedElementToolbarPos(): { x: number, y: number } | null {
+  getSelectedElementToolbarScreenPos(): { x: number; y: number } | null {
     const el = this.getSelectedElement();
     if (!el) return null;
 
-    const { w, h } = this.getSelectedElementDims(el);
+    const geo = this.getElementViewportGeometry(el);
+    const MENU_H = 40;  // altura aproximada del menú en px
+    const MENU_GAP = 60; // 60px sobre el objeto en pantalla
 
-    const cx = el.x + w / 2;
-    const cy = el.y + h / 2;
+    const menuX = geo.cx;
+    const menuY = geo.top - MENU_GAP;
 
-    const rad = ((el.rotation || 0) * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
+    // Limitar dentro de pantalla (topbar 60px + altura del menú)
+    const finalX = Math.max(160, Math.min(menuX, window.innerWidth - 160));
+    const finalY = Math.max(60 + MENU_H, Math.min(menuY, window.innerHeight - MENU_H));
 
-    const halfW = w / 2;
-    const halfH = h / 2;
-
-    const corners = [
-      { x: -halfW, y: -halfH },
-      { x: halfW, y: -halfH },
-      { x: halfW, y: halfH },
-      { x: -halfW, y: halfH }
-    ];
-
-    let minY = Infinity;
-    for (const pt of corners) {
-      const rotY = pt.x * sin + pt.y * cos;
-      if (rotY < minY) {
-        minY = rotY;
-      }
-    }
-
-    return {
-      x: cx,
-      y: cy + minY - 15
-    };
+    return { x: finalX, y: finalY };
   }
 
   goBack() {
@@ -612,6 +723,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.zoom = newZoom;
 
       this.showZoomUi();
+      this.showMinimapUi();
       this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
     }
   }
@@ -634,6 +746,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.zoom = newZoom;
 
     this.showZoomUi();
+    this.showMinimapUi();
   }
 
   // ─── Lógica de Mini-Mapa ──────────────────────────────────────────────────
@@ -655,7 +768,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     // Expandir límites según los elementos en el canvas
     elements.forEach(el => {
       const w = el.type === 'note' ? 250 : (el.width || 100);
-      const h = el.type === 'note' ? 144 : (el.height || 100);
+      const h = el.type === 'note' ? (el.minimized ? 28 : 144) : (el.height || 100);
       if (el.x < minX) minX = el.x;
       if (el.x + w > maxX) maxX = el.x + w;
       if (el.y < minY) minY = el.y;
@@ -704,7 +817,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     
     return elements.map(el => {
       const w = el.type === 'note' ? 250 : (el.width || 100);
-      const h = el.type === 'note' ? 144 : (el.height || 100);
+      const h = el.type === 'note' ? (el.minimized ? 28 : 144) : (el.height || 100);
       return {
         id: el.id,
         type: el.type,

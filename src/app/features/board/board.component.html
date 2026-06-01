@@ -2,7 +2,7 @@
 <app-loading #loadingRef *ngIf="showLoading" (fadeOutDone)="showLoading = false"></app-loading>
 
 <div class="relative w-screen h-screen overflow-hidden bg-darkBg canvas-wrapper cursor-grab select-none"
-  *ngIf="!isLoading" [class.cursor-grabbing]="isPanning" [style.background-position]="panX + 'px ' + panY + 'px'"
+  *ngIf="!isLoading" [class.cursor-grabbing]="isPanning" [class.!cursor-none]="isRotatingId !== null" [style.background-position]="panX + 'px ' + panY + 'px'"
   style="background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px;"
   (mousedown)="startPan($event)">
 
@@ -349,7 +349,7 @@
     <ng-container *ngFor="let note of canvasService.elements(); trackBy: trackByNoteId">
 
       <!-- ─── NOTA DE TEXTO ─── -->
-      <div *ngIf="note.type === 'note'" class="absolute shadow-none ring-1 ring-white/10 group group-note"
+      <div *ngIf="note.type === 'note'" class="absolute shadow-none ring-1 ring-white/10 group group-note rounded-xl overflow-hidden"
         [class.ring-2]="selectedElementId === note.id" [class.ring-neonBlue]="selectedElementId === note.id"
         [class.ring-offset-2]="selectedElementId === note.id"
         [class.ring-offset-transparent]="selectedElementId === note.id"
@@ -357,22 +357,31 @@
         [style.z-index]="(note.layer || 1) * 10"
         [ngStyle]="{'background-color': note.color}" (mousedown)="startDrag($event, note)"
         (click)="selectElement($event, note)"
-        style="width: 250px; border-radius: 0; transform-origin: center center;">
+        style="width: 250px; border-radius: 12px; transform-origin: center center;">
 
-        <div
-          class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/10 hover:bg-white/30 border border-white/20 hover:border-white/50 rounded-full cursor-grab opacity-0 group-[.group-note]:hover:opacity-100 transition-all pointer-events-auto flex items-center justify-center p-0.5"
-          (mousedown)="startRotate($event, note)">
-          <div class="w-1.5 h-1.5 rounded-full bg-white/70"></div>
+
+        <div class="bg-black/40 px-2.5 py-1.5 flex justify-between items-center select-none cursor-move rounded-t-xl border-b border-white/5">
+          <!-- Título editable de la nota -->
+          <input [ngModel]="note.title || ''" (ngModelChange)="updateTitle(note, $event)"
+            (mousedown)="$event.stopPropagation()"
+            placeholder="Nota sin título"
+            class="bg-transparent border-none outline-none text-[10px] uppercase tracking-wider text-white font-bold placeholder-gray-500/80 w-[160px] focus:placeholder-transparent" />
+          
+          <div class="flex items-center gap-1.5">
+            <!-- Botón de minimizar/maximizar -->
+            <button (click)="toggleMinimizeNote($event, note)"
+              class="text-gray-400 hover:text-white font-bold cursor-pointer text-xs px-1 leading-none transition-colors"
+              [title]="note.minimized ? 'Maximizar' : 'Minimizar'">
+              {{ note.minimized ? '▲' : '▼' }}
+            </button>
+            <!-- Botón de cerrar/eliminar -->
+            <button (click)="deleteNote(note.id)"
+              class="text-red-500/85 hover:text-red-400 font-black cursor-pointer px-1 leading-none text-sm transition-colors">×</button>
+          </div>
         </div>
 
-        <div class="bg-black/40 px-2 py-0.5 flex justify-between items-center select-none cursor-move">
-          <span class="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Node-{{note.id | slice:0:4}}</span>
-          <button (click)="deleteNote(note.id)"
-            class="text-red-500/80 hover:text-red-400 font-black cursor-pointer px-1">×</button>
-        </div>
-
-        <textarea [ngModel]="note.content" (ngModelChange)="updateContent(note, $event)"
-          class="w-full h-32 p-3 bg-transparent text-gray-200 focus:outline-none resize-none text-sm font-medium focus:ring-[1px] focus:ring-neonBlue/50"
+        <textarea *ngIf="!note.minimized" [ngModel]="note.content" (ngModelChange)="updateContent(note, $event)"
+          class="w-full h-32 p-3 bg-transparent text-gray-200 focus:outline-none resize-none text-sm font-medium focus:ring-[1px] focus:ring-neonBlue/50 rounded-b-xl"
           placeholder="Escribe texto plano...">
         </textarea>
       </div>
@@ -388,11 +397,6 @@
         (mousedown)="startDrag($event, note)" (click)="selectElement($event, note)"
         style="border-radius: 0; transform-origin: center center;">
 
-        <div
-          class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/10 hover:bg-white/30 border border-white/20 hover:border-white/50 rounded-full cursor-grab opacity-0 group-[.group-img]:hover:opacity-100 transition-all pointer-events-auto flex items-center justify-center p-0.5"
-          (mousedown)="startRotate($event, note)">
-          <div class="w-1.5 h-1.5 rounded-full bg-white/70"></div>
-        </div>
 
         <div class="bg-black/60 px-2 py-0.5 flex justify-between items-center select-none h-6">
           <div class="flex items-center gap-1.5">
@@ -437,12 +441,6 @@
         [style.height.px]="note.height" [style.z-index]="(note.layer || 1) * 10" style="transform-origin: center center;" (mousedown)="startDrag($event, note)"
         (click)="selectElement($event, note)">
 
-        <div
-          class="absolute -top-6 left-1/2 -translate-x-1/2 w-4 h-4 bg-white/10 hover:bg-white/30 border border-white/20 hover:border-white/50 rounded-full cursor-grab transition-all pointer-events-auto flex items-center justify-center p-0.5"
-          [class.opacity-0]="selectedElementId !== note.id" [class.opacity-100]="selectedElementId === note.id"
-          (mousedown)="startRotate($event, note)">
-          <div class="w-1.5 h-1.5 rounded-full bg-white/70"></div>
-        </div>
 
         <svg *ngIf="note.shapeType !== 'line' && note.shapeType !== 'arrow'"
           class="w-full h-full pointer-events-none drop-shadow-md" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -505,182 +503,230 @@
       </div>
     </ng-container>
 
-    <!-- Unified Floating Toolbar for the Selected Element -->
-    <div *ngIf="getSelectedElement() as selectedEl"
-         class="absolute bg-[#0d0d10]/95 backdrop-blur-sm rounded-lg flex items-center gap-1.5 p-1.5 pointer-events-auto border border-white/15 whitespace-nowrap shadow-2xl z-[100]"
-         [style.left.px]="getSelectedElementToolbarPos()?.x"
-         [style.top.px]="getSelectedElementToolbarPos()?.y"
-         style="transform: translate(-50%, -100%); transform-origin: center bottom;"
-         (mousedown)="$event.stopPropagation()"
-         (click)="$event.stopPropagation()">
+  </div>
 
-      <!-- 1. STANDALONE BUTTONS (DELETE & COPY) -->
-      <!-- Delete Button -->
-      <button (click)="deleteNote(selectedEl.id)" title="Eliminar"
-              class="w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-colors cursor-pointer">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-          <line x1="10" y1="11" x2="10" y2="17"></line>
-          <line x1="14" y1="11" x2="14" y2="17"></line>
-        </svg>
-      </button>
+  <!-- Unified Floating Toolbar for the Selected Element -->
+  <div *ngIf="getSelectedElement() as selectedEl"
+       [class.opacity-0]="isRotatingId !== null"
+       [class.pointer-events-none]="isRotatingId !== null"
+       class="fixed bg-[#0d0d10]/95 backdrop-blur-sm rounded-lg flex items-center gap-1.5 p-1.5 pointer-events-auto border border-white/15 whitespace-nowrap shadow-2xl z-[100] transition-opacity duration-200"
+       [style.left.px]="getSelectedElementToolbarScreenPos()?.x"
+       [style.top.px]="getSelectedElementToolbarScreenPos()?.y"
+       style="transform: translate(-50%, -100%); transform-origin: center bottom;"
+       (mousedown)="$event.stopPropagation()"
+       (click)="$event.stopPropagation()">
 
-      <!-- Copy/Duplicate Button -->
-      <button (click)="copyElement(selectedEl.id)" title="Duplicar"
-              class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
-        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-      </button>
+    <!-- 1. STANDALONE BUTTONS (DELETE & COPY) -->
+    <!-- Delete Button -->
+    <button (click)="deleteNote(selectedEl.id)" title="Eliminar"
+            class="w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded transition-colors cursor-pointer">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+        <line x1="10" y1="11" x2="10" y2="17"></line>
+        <line x1="14" y1="11" x2="14" y2="17"></line>
+      </svg>
+    </button>
 
-      <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+    <!-- Copy/Duplicate Button -->
+    <button (click)="copyElement(selectedEl.id)" title="Duplicar"
+            class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
 
-      <!-- 2. COLOR POPUP -->
-      <ng-container *ngIf="selectedEl.type !== 'image'">
-        <div class="relative flex items-center">
-          <button (click)="toggleSubmenu('color')" title="Color"
-                  class="w-7 h-7 flex items-center justify-center rounded transition-all cursor-pointer border"
-                  [style.border-color]="selectedEl.color"
-                  [style.background-color]="selectedEl.color + '22'"
-                  [ngClass]="activeSubmenu === 'color' ? 'bg-white/10 ring-1 ring-white/30' : 'hover:bg-white/5'">
-            <span class="w-4 h-4 rounded-full border border-white/30 shadow-sm" [style.background]="selectedEl.color.startsWith('linear') || selectedEl.color.startsWith('conic') ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : selectedEl.color"></span>
-          </button>
-          
-          <!-- Color Dropdown / Popover -->
-          <div *ngIf="activeSubmenu === 'color'"
-               class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-2 rounded-lg flex items-center gap-1.5 shadow-2xl z-50 pointer-events-auto">
-            <!-- Custom color picker -->
-            <label class="w-6 h-6 rounded-full overflow-hidden cursor-pointer flex items-center justify-center hover:scale-110 transition-transform shadow-sm ring-1 ring-white/30 relative"
-                   title="Color personalizado"
-                   style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
-              <span class="text-black text-[11px] drop-shadow-md font-black leading-none">+</span>
-              <input type="color" [value]="selectedEl.color" (change)="changeColor(selectedEl.id, $any($event.target).value)"
-                     (mousedown)="$event.stopPropagation()" class="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
-            </label>
-            <!-- Presets -->
-            <button (click)="changeColor(selectedEl.id, '#EF4444')"
-                    class="w-5 h-5 rounded-full bg-red-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <button (click)="changeColor(selectedEl.id, '#3B82F6')"
-                    class="w-5 h-5 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <button (click)="changeColor(selectedEl.id, '#10B981')"
-                    class="w-5 h-5 rounded-full bg-emerald-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <button (click)="changeColor(selectedEl.id, '#F59E0B')"
-                    class="w-5 h-5 rounded-full bg-amber-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <button (click)="changeColor(selectedEl.id, '#8B5CF6')"
-                    class="w-5 h-5 rounded-full bg-violet-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <button (click)="changeColor(selectedEl.id, '#121215')"
-                    class="w-5 h-5 rounded-full bg-zinc-900 border border-white/20 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
-            <!-- Arrow indicator -->
-            <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0d0d10]"></div>
-          </div>
-        </div>
-        <div class="w-px h-5 bg-white/15 mx-0.5"></div>
-      </ng-container>
+    <div class="w-px h-5 bg-white/15 mx-0.5"></div>
 
-      <!-- 3. LAYER POPUP -->
+    <!-- 2. COLOR POPUP -->
+    <ng-container *ngIf="selectedEl.type !== 'image'">
       <div class="relative flex items-center">
-        <button (click)="toggleSubmenu('layer')" title="Capas"
-                class="w-7 h-7 flex items-center justify-center text-gray-300 rounded transition-colors cursor-pointer"
-                [ngClass]="activeSubmenu === 'layer' ? 'bg-white/10 text-white border border-white/20' : 'hover:bg-white/10 hover:text-white'">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-               stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
+        <button (click)="toggleSubmenu('color')" title="Color"
+                class="w-7 h-7 flex items-center justify-center rounded transition-all cursor-pointer border"
+                [style.border-color]="selectedEl.color"
+                [style.background-color]="selectedEl.color + '22'"
+                [ngClass]="activeSubmenu === 'color' ? 'bg-white/10 ring-1 ring-white/30' : 'hover:bg-white/5'">
+          <span class="w-4 h-4 rounded-full border border-white/30 shadow-sm" [style.background]="selectedEl.color.startsWith('linear') || selectedEl.color.startsWith('conic') ? 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' : selectedEl.color"></span>
         </button>
         
-        <!-- Layers Dropdown / Popover -->
-        <div *ngIf="activeSubmenu === 'layer'"
-             class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-1.5 rounded-lg flex items-center gap-1 shadow-2xl z-50 pointer-events-auto">
-          <span class="text-[9px] text-gray-400 uppercase tracking-widest mr-1 font-mono pl-1">Capa</span>
-          <button *ngFor="let l of [1, 2, 3, 4]" (click)="changeLayer(selectedEl.id, l)"
-                  class="w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded transition-colors cursor-pointer"
-                  [ngClass]="(selectedEl.layer || 1) === l ? 'bg-neonBlue text-darkBg' : 'text-gray-400 hover:bg-white/10'">
-            {{ l }}
-          </button>
+        <!-- Color Dropdown / Popover -->
+        <div *ngIf="activeSubmenu === 'color'"
+             class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-2 rounded-lg flex items-center gap-1.5 shadow-2xl z-50 pointer-events-auto">
+          <!-- Custom color picker -->
+          <label class="w-6 h-6 rounded-full overflow-hidden cursor-pointer flex items-center justify-center hover:scale-110 transition-transform shadow-sm ring-1 ring-white/30 relative"
+                 title="Color personalizado"
+                 style="background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);">
+            <span class="text-black text-[11px] drop-shadow-md font-black leading-none">+</span>
+            <input type="color" [value]="selectedEl.color" (change)="changeColor(selectedEl.id, $any($event.target).value)"
+                   (mousedown)="$event.stopPropagation()" class="absolute inset-0 w-full h-full cursor-pointer opacity-0" />
+          </label>
+          <!-- Presets -->
+          <button (click)="changeColor(selectedEl.id, '#EF4444')"
+                  class="w-5 h-5 rounded-full bg-red-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+          <button (click)="changeColor(selectedEl.id, '#3B82F6')"
+                  class="w-5 h-5 rounded-full bg-blue-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+          <button (click)="changeColor(selectedEl.id, '#10B981')"
+                  class="w-5 h-5 rounded-full bg-emerald-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+          <button (click)="changeColor(selectedEl.id, '#F59E0B')"
+                  class="w-5 h-5 rounded-full bg-amber-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+          <button (click)="changeColor(selectedEl.id, '#8B5CF6')"
+                  class="w-5 h-5 rounded-full bg-violet-500 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
+          <button (click)="changeColor(selectedEl.id, '#121215')"
+                  class="w-5 h-5 rounded-full bg-zinc-900 border border-white/20 hover:scale-110 transition-transform shadow-sm ring-1 ring-white/10 cursor-pointer"></button>
           <!-- Arrow indicator -->
           <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0d0d10]"></div>
         </div>
       </div>
+      <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+    </ng-container>
 
-      <!-- 4. QUICK OPTIONS POPUP -->
-      <ng-container *ngIf="selectedEl.type === 'shape'">
-        <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+    <!-- 3. LAYER POPUP -->
+    <div class="relative flex items-center">
+      <button (click)="toggleSubmenu('layer')" title="Capas"
+              class="w-7 h-7 flex items-center justify-center text-gray-300 rounded transition-colors cursor-pointer"
+              [ngClass]="activeSubmenu === 'layer' ? 'bg-white/10 text-white border border-white/20' : 'hover:bg-white/10 hover:text-white'">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
+      
+      <!-- Layers Dropdown / Popover -->
+      <div *ngIf="activeSubmenu === 'layer'"
+           class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-1.5 rounded-lg flex items-center gap-1 shadow-2xl z-50 pointer-events-auto">
+        <span class="text-[9px] text-gray-400 uppercase tracking-widest mr-1 font-mono pl-1">Capa</span>
+        <button *ngFor="let l of [1, 2, 3, 4]" (click)="changeLayer(selectedEl.id, l)"
+                class="w-6 h-6 flex items-center justify-center text-[10px] font-bold rounded transition-colors cursor-pointer"
+                [ngClass]="(selectedEl.layer || 1) === l ? 'bg-neonBlue text-darkBg' : 'text-gray-400 hover:bg-white/10'">
+          {{ l }}
+        </button>
+        <!-- Arrow indicator -->
+        <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0d0d10]"></div>
+      </div>
+    </div>
+
+    <!-- 4. QUICK OPTIONS POPUP -->
+    <ng-container *ngIf="selectedEl.type === 'shape'">
+      <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+      
+      <div class="relative flex items-center">
+        <button (click)="toggleSubmenu('quick')" title="Opciones Rápidas"
+                class="w-7 h-7 flex items-center justify-center text-gray-300 rounded transition-colors cursor-pointer"
+                [ngClass]="activeSubmenu === 'quick' ? 'bg-white/10 text-white border border-white/20' : 'hover:bg-white/10 hover:text-white'">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
         
-        <div class="relative flex items-center">
-          <button (click)="toggleSubmenu('quick')" title="Opciones Rápidas"
-                  class="w-7 h-7 flex items-center justify-center text-gray-300 rounded transition-colors cursor-pointer"
-                  [ngClass]="activeSubmenu === 'quick' ? 'bg-white/10 text-white border border-white/20' : 'hover:bg-white/10 hover:text-white'">
+        <!-- Quick Options Dropdown / Popover -->
+        <div *ngIf="activeSubmenu === 'quick'"
+             class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-1.5 rounded-lg flex items-center gap-1 shadow-2xl z-50 pointer-events-auto">
+          
+          <!-- Rotate 45° -->
+          <button (click)="rotateShape(selectedEl.id)" title="Rotar 45°"
+                  class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
             </svg>
           </button>
           
-          <!-- Quick Options Dropdown / Popover -->
-          <div *ngIf="activeSubmenu === 'quick'"
-               class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#0d0d10] border border-white/15 p-1.5 rounded-lg flex items-center gap-1 shadow-2xl z-50 pointer-events-auto">
-            
-            <!-- Rotate 45° -->
-            <button (click)="rotateShape(selectedEl.id)" title="Rotar 45°"
-                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="1 4 1 10 7 10"></polyline>
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-              </svg>
-            </button>
-            
-            <div class="w-px h-5 bg-white/15 mx-0.5"></div>
-            
-            <!-- Wider -->
-            <button (click)="deformShape(selectedEl.id, 'wider')" title="Más ancho"
-                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="17 8 21 12 17 16"></polyline>
-                <polyline points="7 8 3 12 7 16"></polyline>
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-              </svg>
-            </button>
-            
-            <!-- Taller -->
-            <button (click)="deformShape(selectedEl.id, 'taller')" title="Más alto"
-                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="8 7 12 3 16 7"></polyline>
-                <polyline points="8 17 12 21 16 17"></polyline>
-                <line x1="12" y1="3" x2="12" y2="21"></line>
-              </svg>
-            </button>
-            
-            <!-- Reset 1:1 -->
-            <button (click)="deformShape(selectedEl.id, 'reset')" title="Restablecer proporciones"
-                    class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer text-[10px] font-bold">
-              1:1
-            </button>
-            
-            <!-- Arrow indicator -->
-            <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0d0d10]"></div>
-          </div>
+          <div class="w-px h-5 bg-white/15 mx-0.5"></div>
+          
+          <!-- Wider -->
+          <button (click)="deformShape(selectedEl.id, 'wider')" title="Más ancho"
+                  class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 8 21 12 17 16"></polyline>
+              <polyline points="7 8 3 12 7 16"></polyline>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+            </svg>
+          </button>
+          
+          <!-- Taller -->
+          <button (click)="deformShape(selectedEl.id, 'taller')" title="Más alto"
+                  class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="8 7 12 3 16 7"></polyline>
+              <polyline points="8 17 12 21 16 17"></polyline>
+              <line x1="12" y1="3" x2="12" y2="21"></line>
+            </svg>
+          </button>
+          
+          <!-- Reset 1:1 -->
+          <button (click)="deformShape(selectedEl.id, 'reset')" title="Restablecer proporciones"
+                  class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer text-[10px] font-bold">
+            1:1
+          </button>
+          
+          <!-- Arrow indicator -->
+          <div class="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0d0d10]"></div>
         </div>
-      </ng-container>
-
-    </div>
+      </div>
+    </ng-container>
 
   </div>
 
+  <!-- Rotation Handle Overlay (root-level, never clipped by element transform) -->
+  <ng-container *ngIf="getSelectedElement() as rotEl">
+    <div *ngIf="isRotatingId === null && getRotateHandleScreenPos(rotEl) as handlePos"
+         class="fixed z-[99] w-6 h-6 rounded-full bg-[#0d0d10]/90 border border-white/25 hover:border-white/60 hover:bg-white/20 cursor-grab active:cursor-grabbing flex items-center justify-center shadow-lg pointer-events-auto transition-colors duration-150"
+         [style.left.px]="handlePos.x"
+         [style.top.px]="handlePos.y"
+         style="transform: translate(-50%, -50%);"
+         (mousedown)="startRotate($event, rotEl)">
+      <svg class="w-3.5 h-3.5 text-white/85" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.5 2v6h-6"/>
+        <path d="M21.34 15.57a10 10 0 1 1-.57-8.38"/>
+      </svg>
+    </div>
+  </ng-container>
+
+  <!-- Custom Rotating Cursor for Canva-style rotation -->
+  <div *ngIf="isRotatingId !== null"
+       class="fixed pointer-events-none z-[9999] flex items-center justify-center"
+       [style.left.px]="mouseScreenX"
+       [style.top.px]="mouseScreenY"
+       [style.transform]="'translate(-50%, -50%) rotate(' + (getSelectedElement()?.rotation || 0) + 'deg)'">
+    <svg class="w-7 h-7 drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- White outline for visibility on dark backgrounds -->
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 3v5h-5" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Black core -->
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" stroke="#121215" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M21 3v5h-5" stroke="#121215" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <!-- Floating Degree Counter Badge (Canva-style) -->
+  <ng-container *ngIf="isRotatingId !== null && getSelectedElement() as rotEl">
+    <div *ngIf="getDegreeBadgeScreenPos(rotEl) as badgePos"
+         class="fixed z-[100] bg-zinc-950/90 backdrop-blur-sm text-white text-xs font-bold py-1 px-2.5 rounded-lg border border-white/10 shadow-2xl pointer-events-none select-none font-mono flex items-center justify-center"
+         [style.left.px]="badgePos.x"
+         [style.top.px]="badgePos.y"
+         style="transform: translate(-50%, -50%);">
+      {{ getDisplayRotation(rotEl) }}°
+    </div>
+  </ng-container>
+
   <!-- UI: Barra de Control de Zoom -->
-  <div
-    class="fixed right-4 top-1/2 -translate-y-1/2 z-[60] flex flex-col items-center gap-2 bg-black/60 backdrop-blur border border-white/10 p-2 rounded-full shadow-xl transition-opacity duration-300 pointer-events-auto"
-    [ngClass]="isZoomingUiVisible ? 'opacity-100' : 'opacity-0 hover:opacity-100'">
+  <div *ngIf="zoomConfig !== 'disabled'"
+    class="fixed right-4 top-1/2 -translate-y-1/2 z-[60] flex flex-col items-center gap-2 bg-black/60 backdrop-blur border border-white/10 p-2 rounded-full shadow-xl transition-all duration-300 pointer-events-auto"
+    [ngClass]="{
+      'opacity-100': zoomConfig === 'always' || isZoomingUiVisible,
+      'opacity-0 hover:opacity-100 focus-within:opacity-100': zoomConfig === 'active' && !isZoomingUiVisible
+    }">
     <button (click)="changeZoom(0.1)"
       class="w-8 h-8 rounded-full bg-white/5 hover:bg-white/20 hover:scale-110 text-white flex items-center justify-center font-bold transition-all text-xl shadow-inner">+</button>
 
@@ -709,18 +755,19 @@
   </div>
 
   <!-- UI: Mini-Mapa Interactivo -->
-  <div *ngIf="showMinimap"
-    class="fixed bottom-4 right-4 z-50 flex flex-col bg-[#0A0A0C]/85 backdrop-blur border border-white/10 p-1 pointer-events-auto select-none shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300">
+  <div *ngIf="minimapConfig !== 'disabled' && showMinimap"
+    class="fixed bottom-4 right-4 z-50 flex flex-col bg-[#0A0A0C]/85 backdrop-blur border border-white/10 p-1 pointer-events-auto select-none shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-all duration-300"
+    [ngClass]="{
+      'opacity-100': minimapConfig === 'always' || isMinimapUiVisible || isDraggingMinimap,
+      'opacity-0 hover:opacity-100 focus-within:opacity-100': minimapConfig === 'active' && !isMinimapUiVisible && !isDraggingMinimap
+    }">
     
-    <!-- Header del Mini-Mapa -->
-    <div class="flex items-center justify-between px-2 py-1 border-b border-white/10 mb-1 bg-black/40">
-      <span class="text-[9px] font-mono font-bold tracking-widest text-white uppercase flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 bg-neonBlue animate-pulse"></span>
-        Radar Pizarra
+    <!-- Indicador de título del Mini-Mapa -->
+    <div class="flex items-center px-2 py-0.5 mb-0.5">
+      <span class="text-[8px] font-mono font-bold tracking-widest text-white/40 uppercase flex items-center gap-1">
+        <span class="w-1 h-1 bg-neonBlue/60 rounded-full animate-pulse"></span>
+        Radar
       </span>
-      <button (click)="showMinimap = false" class="text-gray-400 hover:text-white text-[10px] font-bold px-1 transition-colors uppercase tracking-wider cursor-pointer">
-        Ocultar
-      </button>
     </div>
 
     <!-- Contenedor del Mapa -->
@@ -780,7 +827,7 @@
   </div>
 
   <!-- Botón pequeño para reabrir el Mini-Mapa si está oculto -->
-  <button *ngIf="!showMinimap" (click)="showMinimap = true"
+  <button *ngIf="minimapConfig !== 'disabled' && !showMinimap" (click)="showMinimap = true"
     class="fixed bottom-4 right-4 z-50 bg-[#0A0A0C]/90 hover:bg-white/5 border border-neonBlue/40 text-neonBlue text-[9px] font-bold tracking-widest uppercase py-2 px-3 transition-colors pointer-events-auto cursor-pointer">
     🛰️ Mostrar Radar
   </button>

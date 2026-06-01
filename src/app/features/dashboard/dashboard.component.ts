@@ -95,9 +95,38 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.showCalendar.update(v => !v);
   }
 
+  // ─── Minimap & Zoom UI Config ─────────────────────────────────────────────
+  minimapConfig = signal<'active' | 'always' | 'disabled'>('active');
+  zoomConfig = signal<'active' | 'always' | 'disabled'>('active');
+
+  updateMinimapConfig(value: 'active' | 'always' | 'disabled') {
+    this.minimapConfig.set(value);
+    localStorage.setItem('dokyuu_minimap_config', value);
+  }
+
+  updateZoomConfig(value: 'active' | 'always' | 'disabled') {
+    this.zoomConfig.set(value);
+    localStorage.setItem('dokyuu_zoom_config', value);
+  }
+
   ngOnInit() {
     this.titleService.setTitle('Dokyuu — Panel');
     this.fetchBoards();
+
+    // Load Board UI settings from localStorage
+    const storedMinimap = localStorage.getItem('dokyuu_minimap_config');
+    if (storedMinimap === 'active' || storedMinimap === 'always' || storedMinimap === 'disabled') {
+      this.minimapConfig.set(storedMinimap);
+    } else {
+      this.minimapConfig.set('active');
+    }
+
+    const storedZoom = localStorage.getItem('dokyuu_zoom_config');
+    if (storedZoom === 'active' || storedZoom === 'always' || storedZoom === 'disabled') {
+      this.zoomConfig.set(storedZoom);
+    } else {
+      this.zoomConfig.set('active');
+    }
 
     // Detect timezone
     try {
