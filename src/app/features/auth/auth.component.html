@@ -1,7 +1,9 @@
-<div class="flex h-screen w-full bg-darkBg text-white overflow-hidden">
+<div class="flex h-screen w-full bg-darkBg text-white overflow-hidden relative">
+  <!-- Interactive Background -->
+  <app-interactive-bg class="absolute inset-0 z-0"></app-interactive-bg>
   
   <!-- Mitad Izquierda (Cuerpo oscuro, acentos de iluminación lejanos - Dual Split) -->
-  <div class="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-darkSurface relative overflow-hidden" style="border-right: 1px solid rgba(255,255,255,0.05)">
+  <div class="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-darkSurface/40 backdrop-blur-md relative overflow-hidden z-10" style="border-right: 1px solid rgba(255,255,255,0.05)">
     <!-- Decoración sutil de Neon (Background abstract light blurs) -->
     <div class="absolute -top-40 -left-40 w-96 h-96 bg-neonBlue/10 blur-3xl z-0 pointer-events-none"></div>
     <div class="absolute bottom-0 right-0 w-[500px] h-[500px] bg-neonBlueHover/5 blur-3xl z-0 pointer-events-none"></div>
@@ -25,7 +27,7 @@
   <div class="w-full lg:w-1/2 flex items-center justify-center p-8 z-10 glass lg:!border-none md:!border-none !border-white/5 relative">
     
     <!-- Contenedor estricto sin bordes redondeados y sin sombras, diseño plano agresivo -->
-    <div class="w-full max-w-md bg-darkBg border border-white/10 p-10">
+    <div class="w-full max-w-md bg-darkSurface/70 backdrop-blur-xl border border-white/10 p-10 z-10">
       
       <div class="mb-10">
         <h2 class="text-2xl font-semibold mb-2">

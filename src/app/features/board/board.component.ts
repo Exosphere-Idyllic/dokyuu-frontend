@@ -8,11 +8,12 @@ import { BoardsService } from '../../core/boards/boards.service';
 import { LoadingComponent } from '../loading/loading.component';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime } from 'rxjs';
+import { InteractiveBgComponent } from '../../shared/interactive-bg/interactive-bg.component';
 
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, FormsModule, LoadingComponent],
+  imports: [CommonModule, FormsModule, LoadingComponent, InteractiveBgComponent],
   templateUrl: './board.component.html',
 })
 export class BoardComponent implements OnInit, OnDestroy {

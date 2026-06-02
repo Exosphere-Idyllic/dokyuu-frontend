@@ -8,11 +8,12 @@ import { BoardsService, Board } from '../../core/boards/boards.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService, THEMES, Theme, ThemeId } from '../../core/theme/theme.service';
 import { CalendarWidgetComponent } from './calendar-widget/calendar-widget.component';
+import { InteractiveBgComponent } from '../../shared/interactive-bg/interactive-bg.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, CalendarWidgetComponent],
+  imports: [CommonModule, FormsModule, CalendarWidgetComponent, InteractiveBgComponent],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit, OnDestroy {

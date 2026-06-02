@@ -1,9 +1,12 @@
-<div class="flex h-screen w-full overflow-hidden font-sans"
+<div class="flex h-screen w-full overflow-hidden font-sans relative"
   style="background-color: var(--color-bg); color: var(--color-text)">
 
+  <!-- Interactive Background -->
+  <app-interactive-bg class="absolute inset-0 z-0"></app-interactive-bg>
+
   <!-- ═══ SIDEBAR ═══ -->
-  <aside class="w-64 flex flex-col justify-between py-8 px-6 flex-shrink-0"
-    style="background-color: var(--color-surface); border-right: 1px solid var(--color-border)">
+  <aside class="w-64 flex flex-col justify-between py-8 px-6 flex-shrink-0 z-10"
+    style="background-color: var(--color-glass); border-right: 1px solid var(--color-border); backdrop-filter: blur(16px);">
     <div>
       <h2 class="text-2xl font-bold tracking-tight mb-1" style="color: var(--color-text)">Dokyuu</h2>
       <p class="text-xs font-semibold uppercase tracking-widest mb-10" style="color: var(--color-accent)">Lobby Global
@@ -105,7 +108,7 @@
 
   <!-- ═══ MAIN CONTENT ═══ -->
   <main
-    class="flex-1 overflow-y-auto p-10 relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+    class="flex-1 overflow-y-auto p-10 relative z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
     <div class="absolute -top-40 -right-40 w-96 h-96 blur-3xl z-0 pointer-events-none"
       style="background-color: color-mix(in srgb, var(--color-accent) 5%, transparent)"></div>
 

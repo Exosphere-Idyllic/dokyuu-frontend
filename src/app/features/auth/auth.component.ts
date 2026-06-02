@@ -4,11 +4,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { CommonModule } from '@angular/common';
+import { InteractiveBgComponent } from '../../shared/interactive-bg/interactive-bg.component';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [ReactiveFormsModule, CommonModule],
+  imports: [ReactiveFormsModule, CommonModule, InteractiveBgComponent],
   templateUrl: './auth.component.html',
 })
 export class AuthComponent implements OnInit {

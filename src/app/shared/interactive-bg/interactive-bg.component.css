@@ -1,0 +1,99 @@
+:host {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.interactive-bg-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg);
+  transition: background-color 0.8s ease;
+}
+
+/* Blueprint Grid Layer */
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%);
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 85%);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* Atmospheric Glowing Blobs */
+.blob {
+  position: absolute;
+  border-radius: 50% !important;
+  filter: blur(140px);
+  opacity: 0.12;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: float-blob 35s infinite alternate ease-in-out;
+}
+
+.blob-1 {
+  top: -15%;
+  left: 10%;
+  width: 55vw;
+  height: 55vw;
+  background-color: var(--color-accent);
+  animation-duration: 40s;
+}
+
+.blob-2 {
+  bottom: -20%;
+  right: 5%;
+  width: 65vw;
+  height: 65vw;
+  background-color: var(--color-accent);
+  animation-duration: 48s;
+  animation-delay: -7s;
+}
+
+.blob-3 {
+  top: 35%;
+  left: 45%;
+  width: 45vw;
+  height: 45vw;
+  background-color: var(--color-accent);
+  opacity: 0.08;
+  animation-duration: 32s;
+  animation-delay: -15s;
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: block;
+}
+
+/* Float Keyframes for organic fluid blob motion */
+@keyframes float-blob {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  33% {
+    transform: translate(6vw, -8vw) scale(1.15) rotate(120deg);
+  }
+  66% {
+    transform: translate(-7vw, 5vw) scale(0.85) rotate(240deg);
+  }
+  100% {
+    transform: translate(0, 0) scale(1) rotate(360deg);
+  }
+}

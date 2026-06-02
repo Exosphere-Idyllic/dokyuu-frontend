@@ -6,6 +6,9 @@
   style="background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 40px 40px;"
   (mousedown)="startPan($event)">
 
+  <!-- Fondo Interactivo Detrás del Canvas -->
+  <app-interactive-bg class="absolute inset-0 z-0 pointer-events-none"></app-interactive-bg>
+
   <!-- ═══ TOPBAR ═══ -->
   <header
     class="absolute top-0 left-0 w-full p-4 glass z-50 flex items-center justify-between pointer-events-auto shadow-none !border-t-0 !border-x-0 border-white/10">
