@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementR
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasService, BoardElement } from '../../core/canvas/canvas.service';
+import { CanvasService, BoardElement, ImageHistoryItem, ImageHistoryResult } from '../../core/canvas/canvas.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { BoardsService } from '../../core/boards/boards.service';
 import { LoadingComponent } from '../loading/loading.component';
@@ -43,7 +43,22 @@ export class BoardComponent implements OnInit, OnDestroy {
   activeTab: 'users' | 'chat' = 'users';
   newMessageText = '';
   unreadMessagesCount = 0;
-  kickingUserId: string | null = null; // ID del usuario siendo expulsado (para loading state)
+  kickingUserId: string | null = null;
+
+  // Panel de historial de imágenes (izquierda)
+  showHistoryPanel = false;
+  showImageDropdown = false;
+  isLoadingHistory = false;
+  personalImages: ImageHistoryItem[] = [];
+  boardImages: ImageHistoryItem[] = [];
+  historyActiveSection: 'board' | 'personal' = 'board';
+
+  // Menú contextual de click derecho
+  showContextMenu = false;
+  contextMenuX = 0;
+  contextMenuY = 0;
+  contextMenuCanvasX = 0;
+  contextMenuCanvasY = 0;
 
   @ViewChild('imageInput') imageInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('chatMessagesContainer') chatMessagesContainer!: ElementRef;
@@ -210,6 +225,10 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.unreadMessagesCount = 0;
       this.scrollToBottom();
     }
+    // Cerrar otros paneles al abrir el de usuarios
+    if (this.showUsersPanel) {
+      this.showHistoryPanel = false;
+    }
   }
 
   selectTab(tab: 'users' | 'chat') {
@@ -241,7 +260,108 @@ export class BoardComponent implements OnInit, OnDestroy {
     return user?.cursorColor || '#4F46E5';
   }
 
-  // ─── Oyentes de eventos físicos ───────────────────────────────────────────
+  // ─── Historial de imágenes ───────────────────────────────────────────────
+
+  openHistoryPanel() {
+    this.showImageDropdown = false;
+    this.showHistoryPanel = true;
+    this.showUsersPanel = false;
+    this.loadImageHistory();
+  }
+
+  closeHistoryPanel() {
+    this.showHistoryPanel = false;
+  }
+
+  loadImageHistory() {
+    this.isLoadingHistory = true;
+    this.canvasService.getImageHistory(this.boardId).subscribe({
+      next: (res: ImageHistoryResult) => {
+        this.personalImages = res.personal || [];
+        this.boardImages = res.board || [];
+        this.isLoadingHistory = false;
+      },
+      error: () => {
+        this.isLoadingHistory = false;
+      }
+    });
+  }
+
+  insertImageFromHistory(img: ImageHistoryItem) {
+    const user = this.authService.currentUser();
+    const MAX_W = 400;
+    const MAX_H = 300;
+    const ratio = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+    const displayW = Math.round(img.width * ratio);
+    const displayH = Math.round(img.height * ratio);
+
+    const newImage: BoardElement = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: 'image',
+      content: img.publicId,
+      x: (window.innerWidth / 2 - this.panX) / this.zoom - displayW / 2,
+      y: (window.innerHeight / 2 - this.panY) / this.zoom - displayH / 2,
+      color: 'transparent',
+      createdBy: user?.sub!,
+      imageUrl: img.url,
+      width: displayW,
+      height: displayH,
+    };
+
+    const updated = [...this.canvasService.elements(), newImage];
+    this.canvasService.emitCanvasUpdate(this.boardId, updated);
+    this.saveSubject.next(updated);
+    this.canvasService.addNotification('Imagen insertada desde el historial', 'success');
+  }
+
+  // ─── Oyentes de eventos físicos ───────────────────────────────────────────────
+
+  // ─── Menú contextual (click derecho) ───────────────────────────────────────
+
+  @HostListener('contextmenu', ['$event'])
+  onContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    // Solo abrir en el lienzo (canvas-wrapper o canvas-layer), no en elementos
+    if (!target.classList.contains('canvas-wrapper') && !target.classList.contains('canvas-layer')) return;
+    e.preventDefault();
+    this.contextMenuX = e.clientX;
+    this.contextMenuY = e.clientY;
+    // Calcular coordenadas en el espacio canvas
+    this.contextMenuCanvasX = (e.clientX - this.panX) / this.zoom;
+    this.contextMenuCanvasY = (e.clientY - this.panY) / this.zoom;
+    this.showContextMenu = true;
+    this.showImageDropdown = false;
+  }
+
+  @HostListener('click')
+  onGlobalClick() {
+    this.showContextMenu = false;
+    this.showImageDropdown = false;
+  }
+
+  closeContextMenu() {
+    this.showContextMenu = false;
+  }
+
+  contextAddNote() {
+    this.closeContextMenu();
+    this.addNote(this.contextMenuCanvasX - 125, this.contextMenuCanvasY - 80);
+  }
+
+  contextAddShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line') {
+    this.closeContextMenu();
+    this.addShape(shape, this.contextMenuCanvasX - 50, this.contextMenuCanvasY - 50);
+  }
+
+  contextUploadImage() {
+    this.closeContextMenu();
+    this.triggerImageUpload();
+  }
+
+  contextOpenHistory() {
+    this.closeContextMenu();
+    this.openHistoryPanel();
+  }
 
   startPan(e: MouseEvent) {
     const target = e.target as HTMLElement;
@@ -349,14 +469,16 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   // ─── Motor de elementos ───────────────────────────────────────────────────
 
-  addNote() {
+  addNote(canvasX?: number, canvasY?: number) {
     const user = this.authService.currentUser();
+    const x = canvasX !== undefined ? canvasX : (window.innerWidth / 2 - this.panX) / this.zoom - 125;
+    const y = canvasY !== undefined ? canvasY : (window.innerHeight / 2 - this.panY) / this.zoom - 80;
     const newNote: BoardElement = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'note',
       content: 'Ingresa texto estratégico...',
-      x: (window.innerWidth / 2 - this.panX) / this.zoom - 125,
-      y: (window.innerHeight / 2 - this.panY) / this.zoom - 80,
+      x,
+      y,
       color: '#121215',
       createdBy: user?.sub!
     };
@@ -366,15 +488,17 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.saveSubject.next(updated);
   }
 
-  addShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line') {
+  addShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line', canvasX?: number, canvasY?: number) {
     const user = this.authService.currentUser();
+    const x = canvasX !== undefined ? canvasX : (window.innerWidth / 2 - this.panX) / this.zoom - 50;
+    const y = canvasY !== undefined ? canvasY : (window.innerHeight / 2 - this.panY) / this.zoom - 50;
     const newShape: BoardElement = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'shape',
       shapeType: shape,
       content: '',
-      x: (window.innerWidth / 2 - this.panX) / this.zoom - 50,
-      y: (window.innerHeight / 2 - this.panY) / this.zoom - 50,
+      x,
+      y,
       width: 100,
       height: 100,
       color: '#3B82F6',
@@ -511,7 +635,7 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.isUploadingImage = true;
     this.uploadError = null;
 
-    this.canvasService.uploadImage(file).subscribe({
+    this.canvasService.uploadImage(file, this.boardId, false).subscribe({
       next: (res: { url: string; publicId: string; width: number; height: number; message: string }) => {
         const user = this.authService.currentUser();
 
@@ -555,6 +679,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       this.activeSubmenu = null;
     }
     this.selectedElementId = note.id;
+    this.showContextMenu = false;
   }
 
   updateContent(note: BoardElement, newContent: string) {
@@ -706,6 +831,11 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   @HostListener('wheel', ['$event'])
   onWheel(e: WheelEvent) {
+    // Si el panel de usuarios/chat está activo, no hacer zoom
+    if (this.showUsersPanel) {
+      return;
+    }
+
     if (e.target instanceof HTMLElement && e.target.tagName.toLowerCase() === 'textarea') {
       return;
     }

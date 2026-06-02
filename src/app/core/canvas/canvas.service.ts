@@ -39,10 +39,28 @@ export interface ConnectedUser {
 
 export interface CloudinaryUploadResult {
   message: string;
+  id: string;
   url: string;
   publicId: string;
   width: number;
   height: number;
+  isPersonal?: boolean;
+  boardId?: string;
+  createdAt?: string;
+}
+
+export interface ImageHistoryItem {
+  id: string;
+  url: string;
+  publicId: string;
+  width: number;
+  height: number;
+  createdAt: string;
+}
+
+export interface ImageHistoryResult {
+  personal: ImageHistoryItem[];
+  board: ImageHistoryItem[];
 }
 
 export interface ToastNotification {
@@ -215,10 +233,17 @@ export class CanvasService {
   }
 
   // ─── Cloudinary ───────────────────────────────────────────────────────────
-  uploadImage(file: File) {
+  uploadImage(file: File, boardId?: string, isPersonal: boolean = true) {
     const formData = new FormData();
     formData.append('image', file);
+    if (boardId) formData.append('boardId', boardId);
+    formData.append('isPersonal', isPersonal ? 'true' : 'false');
     return this.http.post<CloudinaryUploadResult>(`${environment.apiUrl}/files/upload`, formData);
+  }
+
+  getImageHistory(boardId?: string) {
+    const params = boardId ? `?boardId=${boardId}` : '';
+    return this.http.get<ImageHistoryResult>(`${environment.apiUrl}/files/history${params}`);
   }
 
   // ─── Persistencia MongoDB ─────────────────────────────────────────────────
