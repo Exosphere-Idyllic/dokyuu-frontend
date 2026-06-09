@@ -1,14 +1,17 @@
-import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CanvasService, BoardElement, ImageHistoryItem, ImageHistoryResult } from '../../core/canvas/canvas.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { BoardsService } from '../../core/boards/boards.service';
+import { TasksService, Task } from '../../core/tasks/tasks.service';
+import { HttpClient } from '@angular/common/http';
 import { LoadingComponent } from '../loading/loading.component';
 import { FormsModule } from '@angular/forms';
-import { Subject, debounceTime } from 'rxjs';
+import { Subject, debounceTime, firstValueFrom } from 'rxjs';
 import { InteractiveBgComponent } from '../../shared/interactive-bg/interactive-bg.component';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-board',
@@ -21,6 +24,8 @@ export class BoardComponent implements OnInit, OnDestroy {
   canvasService = inject(CanvasService);
   authService = inject(AuthService);
   boardsService = inject(BoardsService);
+  tasksService = inject(TasksService);
+  private http = inject(HttpClient);
   route = inject(ActivatedRoute);
   router = inject(Router);
 
@@ -37,6 +42,20 @@ export class BoardComponent implements OnInit, OnDestroy {
   boardName: string = 'Cargando...';
   boardRole: string = 'Conectando...';
   isHost = false;
+
+  // Task bubble float state & tasks UI
+  showTaskBubble = false;
+  taskBubbleX = 20;
+  taskBubbleY = 200;
+  isDraggingTaskBubble = false;
+  dragBubbleStartX = 0;
+  dragBubbleStartY = 0;
+  showNewTaskModal = false;
+  newTaskTitle = '';
+  newTaskDescription = '';
+  newTaskAssignedTo = '';
+  boardMembers = signal<any[]>([]);
+
 
   // Panel de usuarios conectados y chat
   showUsersPanel = false;
@@ -108,6 +127,12 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.boardId = this.route.snapshot.paramMap.get('id')!;
+    if (!this.boardId) {
+      this.router.navigate(['/dashboard']);
+      return;
+    }
+
     const storedMinimap = localStorage.getItem('dokyuu_minimap_config');
     if (storedMinimap === 'active' || storedMinimap === 'always' || storedMinimap === 'disabled') {
       this.minimapConfig = storedMinimap;
@@ -116,22 +141,6 @@ export class BoardComponent implements OnInit, OnDestroy {
     const storedZoom = localStorage.getItem('dokyuu_zoom_config');
     if (storedZoom === 'active' || storedZoom === 'always' || storedZoom === 'disabled') {
       this.zoomConfig = storedZoom;
-    }
-
-    this.boardsService.getBoards().subscribe((boards: any[]) => {
-      const currentBoard = boards.find(b => b._id === this.boardId);
-      if (currentBoard) {
-        this.boardName = currentBoard.name;
-        this.isHost = currentBoard.myRole === 'host';
-        this.boardRole = this.isHost ? 'Host' :
-          currentBoard.myRole === 'member' ? 'Member' : 'Reader';
-        this.titleService.setTitle(`Dokyuu — ${currentBoard.name}`); // ← añadir esta línea
-      }
-    });
-    this.boardId = this.route.snapshot.paramMap.get('id')!;
-    if (!this.boardId) {
-      this.router.navigate(['/dashboard']);
-      return;
     }
 
     const token = this.authService.currentUser()?.token;
@@ -147,6 +156,14 @@ export class BoardComponent implements OnInit, OnDestroy {
         this.isHost = currentBoard.myRole === 'host';
         this.boardRole = this.isHost ? 'Host' :
           currentBoard.myRole === 'member' ? 'Member' : 'Reader';
+        this.titleService.setTitle(`Dokyuu — ${currentBoard.name}`);
+
+        // Load tasks and members
+        this.tasksService.loadMyTasks(this.boardId);
+        if (this.isHost) {
+          this.tasksService.loadBoardTasks(this.boardId);
+          this.loadBoardMembers();
+        }
       }
     });
 
@@ -194,6 +211,8 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.canvasService.onKicked = null;
     this.canvasService.onChatMessageReceived = null;
     this.canvasService.disconnect();
+    // Cleanup capture session when leaving the board
+    this.tasksService.stopCapture();
   }
 
   // ─── Expulsión de usuarios ────────────────────────────────────────────────
@@ -312,6 +331,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
     this.canvasService.addNotification('Imagen insertada desde el historial', 'success');
+
+    if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId()) {
+      this.tasksService.addElementToTask(this.tasksService.capturingTaskId()!, newImage.id);
+    }
   }
 
   // ─── Oyentes de eventos físicos ───────────────────────────────────────────────
@@ -378,6 +401,17 @@ export class BoardComponent implements OnInit, OnDestroy {
   onMouseMove(e: MouseEvent) {
     this.mouseScreenX = e.clientX;
     this.mouseScreenY = e.clientY;
+
+    if (this.isDraggingTaskBubble) {
+      const dx = e.clientX - this.dragBubbleStartX;
+      const dy = e.clientY - this.dragBubbleStartY;
+      this.taskBubbleX += dx;
+      this.taskBubbleY += dy;
+      this.dragBubbleStartX = e.clientX;
+      this.dragBubbleStartY = e.clientY;
+      return;
+    }
+
     this.cursorSubject.next({ x: (e.clientX - this.panX) / this.zoom, y: (e.clientY - this.panY) / this.zoom });
 
     if (this.isPanning) {
@@ -448,6 +482,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   onMouseUp() {
     this.isPanning = false;
     this.isDraggingMinimap = false;
+    this.isDraggingTaskBubble = false;
 
     if (this.resizingId) {
       this.canvasService.emitCanvasUpdate(this.boardId, this.canvasService.elements());
@@ -486,6 +521,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     const updated = [...this.canvasService.elements(), newNote];
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
+
+    if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId()) {
+      this.tasksService.addElementToTask(this.tasksService.capturingTaskId()!, newNote.id);
+    }
   }
 
   addShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line', canvasX?: number, canvasY?: number) {
@@ -508,6 +547,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     const updated = [...this.canvasService.elements(), newShape];
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
+
+    if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId()) {
+      this.tasksService.addElementToTask(this.tasksService.capturingTaskId()!, newShape.id);
+    }
   }
 
   changeColor(id: string, color: string) {
@@ -662,6 +705,10 @@ export class BoardComponent implements OnInit, OnDestroy {
         this.canvasService.emitCanvasUpdate(this.boardId, updated);
         this.saveSubject.next(updated);
         this.isUploadingImage = false;
+
+        if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId()) {
+          this.tasksService.addElementToTask(this.tasksService.capturingTaskId()!, newImage.id);
+        }
       },
       error: (err: { error?: { message?: string } }) => {
         this.uploadError = err?.error?.message || 'Error al subir la imagen. Intenta de nuevo.';
@@ -749,6 +796,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.canvasService.emitCanvasUpdate(this.boardId, updated);
     this.saveSubject.next(updated);
     this.selectedElementId = newElement.id;
+
+    if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId()) {
+      this.tasksService.addElementToTask(this.tasksService.capturingTaskId()!, newElement.id);
+    }
     this.activeSubmenu = null;
   }
 
@@ -1008,5 +1059,93 @@ export class BoardComponent implements OnInit, OnDestroy {
     // Centrar la cámara en la coordenada seleccionada
     this.panX = window.innerWidth / 2 - worldX * this.zoom;
     this.panY = window.innerHeight / 2 - worldY * this.zoom;
+  }
+
+  // ─── Tareas de la pizarra ───
+
+  isElementInTask(elementId: string): boolean {
+    return this.tasksService.boardTasks().some(
+      t => t.elementIds.includes(elementId) && t.status === 'active'
+    );
+  }
+
+  getElementTaskInfo(elementId: string): Task | null {
+    return this.tasksService.boardTasks().find(
+      t => t.elementIds.includes(elementId)
+    ) || null;
+  }
+
+  async loadBoardMembers() {
+    try {
+      const response = await firstValueFrom(
+        this.http.get<any[]>(`${environment.apiUrl}/members/board/${this.boardId}`)
+      );
+      this.boardMembers.set(response || []);
+    } catch (error) {
+      console.error('Error loading board members:', error);
+    }
+  }
+
+  startDragTaskBubble(e: MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    this.isDraggingTaskBubble = true;
+    this.dragBubbleStartX = e.clientX;
+    this.dragBubbleStartY = e.clientY;
+  }
+
+  openNewTaskModal() {
+    this.showNewTaskModal = true;
+    this.newTaskTitle = '';
+    this.newTaskDescription = '';
+    // Select first member by default if available
+    const members = this.boardMembers();
+    if (members.length > 0) {
+      this.newTaskAssignedTo = members[0].userId._id;
+    } else {
+      this.newTaskAssignedTo = '';
+    }
+  }
+
+  closeNewTaskModal() {
+    this.showNewTaskModal = false;
+  }
+
+  async createNewTask() {
+    if (!this.newTaskTitle.trim() || !this.newTaskAssignedTo) {
+      this.canvasService.addNotification('Por favor, completa el título y asignado.', 'warning');
+      return;
+    }
+    try {
+      await this.tasksService.createTask(
+        this.boardId,
+        this.newTaskTitle.trim(),
+        this.newTaskDescription.trim(),
+        this.newTaskAssignedTo
+      );
+      this.canvasService.addNotification('Tarea asignada exitosamente.', 'success');
+      this.closeNewTaskModal();
+    } catch (error) {
+      this.canvasService.addNotification('Error al crear la tarea.', 'error');
+    }
+  }
+
+  async completeTask(taskId: string) {
+    try {
+      await this.tasksService.completeTask(taskId);
+      this.canvasService.addNotification('Tarea completada.', 'success');
+    } catch (error) {
+      this.canvasService.addNotification('Error al completar la tarea.', 'error');
+    }
+  }
+
+  toggleCapture(taskId: string) {
+    if (this.tasksService.isCapturing() && this.tasksService.capturingTaskId() === taskId) {
+      this.tasksService.stopCapture();
+      this.canvasService.addNotification('Captura de objetos finalizada.', 'info');
+    } else {
+      this.tasksService.startCapture(taskId);
+      this.canvasService.addNotification('Captura de objetos iniciada. Todos los nuevos objetos se marcarán con esta tarea.', 'success');
+    }
   }
 }
