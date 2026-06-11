@@ -33,6 +33,23 @@ export class BoardComponent implements OnInit, OnDestroy {
   breakTimeRemaining = 0;
   breakInterval: any = null;
 
+  // ─── Chat Autocomplete ─────────────────────────────────────────────────────
+  showSuggestions = false;
+  suggestionType: 'command' | 'mention' | null = null;
+  suggestions: any[] = [];
+  selectedSuggestionIndex = 0;
+  private chatInputRef: HTMLInputElement | null = null;
+
+  readonly CHAT_COMMANDS = [
+    { label: '/break time <duración>', description: 'Iniciar tiempo de descanso (ej: 5m, 30s)', prefix: '/break time ', hostOnly: true },
+    { label: '/break time stop', description: 'Detener el descanso activo', prefix: '/break time stop', hostOnly: true },
+    { label: '/w @usuario <mensaje>', description: 'Enviar mensaje privado a un usuario', prefix: '/w @', hostOnly: false },
+  ];
+
+  // ─── Panel DMs ─────────────────────────────────────────────────────────────
+  dmActiveContactId: string | null = null;
+  unreadDmCount = 0;
+
   constructor() {
     effect(() => {
       const state = this.canvasService.breakState();
@@ -90,7 +107,7 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   // Panel de usuarios conectados y chat
   showUsersPanel = false;
-  activeTab: 'users' | 'chat' = 'users';
+  activeTab: 'users' | 'chat' | 'dms' = 'users';
   newMessageText = '';
   unreadMessagesCount = 0;
   kickingUserId: string | null = null;
@@ -206,10 +223,19 @@ export class BoardComponent implements OnInit, OnDestroy {
     };
 
     this.canvasService.onChatMessageReceived = (msg) => {
-      if (!this.showUsersPanel || this.activeTab !== 'chat') {
-        this.unreadMessagesCount++;
+      // Contar mensajes no leídos según el tipo
+      if (msg.isPrivate) {
+        // Mensaje privado: incrementar badge de DMs si no estamos en la pestaña DMs
+        if (!this.showUsersPanel || this.activeTab !== 'dms') {
+          this.unreadDmCount++;
+        }
       } else {
-        this.scrollToBottom();
+        // Mensaje público: incrementar badge de chat si no estamos en la pestaña chat
+        if (!this.showUsersPanel || this.activeTab !== 'chat') {
+          this.unreadMessagesCount++;
+        } else {
+          this.scrollToBottom();
+        }
       }
 
       if (msg.sender._id !== this.currentUserId) {
@@ -225,10 +251,16 @@ export class BoardComponent implements OnInit, OnDestroy {
           if (hasMention) {
             this.playMentionSound();
             this.canvasService.addNotification('Has sido mencionado en el chat', 'info');
+          } else if (msg.isPrivate) {
+            // Notificación suave para mensajes privados
+            this.playMentionSound();
+            const senderName = msg.sender.displayName || msg.sender.email?.split('@')[0] || 'Alguien';
+            this.canvasService.addNotification(`Mensaje privado de ${senderName}`, 'info');
           }
         }
       }
     };
+
 
     this.canvasService.connect(this.boardId, token);
 
@@ -302,12 +334,17 @@ export class BoardComponent implements OnInit, OnDestroy {
     }
   }
 
-  selectTab(tab: 'users' | 'chat') {
+  selectTab(tab: 'users' | 'chat' | 'dms') {
     this.activeTab = tab;
     if (tab === 'chat') {
       this.unreadMessagesCount = 0;
       this.scrollToBottom();
     }
+    if (tab === 'dms') {
+      this.unreadDmCount = 0;
+      this.dmActiveContactId = null;
+    }
+    this.showSuggestions = false;
   }
 
   sendMessage() {
@@ -403,6 +440,141 @@ export class BoardComponent implements OnInit, OnDestroy {
   getMemberColor(userId: string): string {
     const user = this.canvasService.connectedUsers().find(u => u.userId === userId);
     return user?.cursorColor || '#4F46E5';
+  }
+
+  // ─── Autocompletado del Chat ───────────────────────────────────────────────
+
+  onChatInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.chatInputRef = input;
+    const val = input.value;
+    const cursorPos = input.selectionStart ?? val.length;
+    const textBefore = val.slice(0, cursorPos);
+
+    // Detectar '/' al inicio del texto
+    if (val.startsWith('/') && !val.includes(' ')) {
+      const query = val.slice(1).toLowerCase();
+      const filteredCmds = this.CHAT_COMMANDS.filter(c =>
+        (!c.hostOnly || this.isHost) &&
+        c.label.toLowerCase().slice(1).startsWith(query)
+      );
+      if (filteredCmds.length > 0) {
+        this.suggestionType = 'command';
+        this.suggestions = filteredCmds;
+        this.selectedSuggestionIndex = 0;
+        this.showSuggestions = true;
+        return;
+      }
+    }
+
+    // Detectar '@' en cualquier posición del texto
+    const atMatch = textBefore.match(/@([\w]*)$/);
+    if (atMatch) {
+      const query = atMatch[1].toLowerCase();
+      const users = this.canvasService.connectedUsers().filter(u =>
+        u.userId !== this.currentUserId &&
+        ((u.displayName || '').toLowerCase().includes(query) ||
+         u.email.split('@')[0].toLowerCase().includes(query))
+      );
+      this.suggestionType = 'mention';
+      this.suggestions = users;
+      this.selectedSuggestionIndex = 0;
+      this.showSuggestions = users.length > 0;
+      return;
+    }
+
+    // Si no hay nada que autocomplete
+    this.showSuggestions = false;
+    this.suggestionType = null;
+  }
+
+  onChatKeyDown(event: KeyboardEvent) {
+    if (!this.showSuggestions) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.selectedSuggestionIndex = (this.selectedSuggestionIndex + 1) % this.suggestions.length;
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.selectedSuggestionIndex = (this.selectedSuggestionIndex - 1 + this.suggestions.length) % this.suggestions.length;
+    } else if (event.key === 'Tab' || event.key === 'Enter') {
+      if (this.suggestions.length > 0) {
+        event.preventDefault();
+        this.selectSuggestion(this.suggestions[this.selectedSuggestionIndex]);
+      }
+    } else if (event.key === 'Escape') {
+      this.showSuggestions = false;
+    }
+  }
+
+  selectSuggestion(suggestion: any) {
+    if (this.suggestionType === 'command') {
+      this.newMessageText = suggestion.prefix;
+    } else if (this.suggestionType === 'mention') {
+      const name = (suggestion.displayName || suggestion.email.split('@')[0]).replace(/\s+/g, '');
+      // Reemplazar el '@query' actual con '@nombre '
+      this.newMessageText = this.newMessageText.replace(/@[\w]*$/, '@' + name + ' ');
+    }
+    this.showSuggestions = false;
+    this.suggestionType = null;
+    // Enfocar el input nuevamente
+    setTimeout(() => {
+      if (this.chatInputRef) this.chatInputRef.focus();
+    }, 0);
+  }
+
+  /** Renderiza el texto del mensaje resaltando @menciones en dorado */
+  formatMessageText(text: string): string {
+    return text.replace(/@([\w]+)/g, '<span class="mention-tag">@$1</span>');
+  }
+
+  // ─── Panel DMs ──────────────────────────────────────────────────────────────
+
+  /** Obtiene la lista de contactos con quienes hay DMs, con último mensaje */
+  getDmConversations(): { userId: string; displayName: string; email: string; color: string; lastMsg: ChatMessage }[] {
+    const msgs = this.canvasService.chatMessages().filter(m => m.isPrivate);
+    const contactMap = new Map<string, any>();
+
+    for (const msg of msgs) {
+      const isSender = msg.sender._id === this.currentUserId;
+      const contactId = isSender ? msg.recipient?._id : msg.sender._id;
+      const contactName = isSender
+        ? (msg.recipient?.displayName || msg.recipient?.email?.split('@')[0] || '')
+        : (msg.sender.displayName || msg.sender.email?.split('@')[0] || '');
+      const contactEmail = isSender ? (msg.recipient?.email || '') : (msg.sender.email || '');
+
+      if (contactId && !contactMap.has(contactId)) {
+        contactMap.set(contactId, {
+          userId: contactId,
+          displayName: contactName,
+          email: contactEmail,
+          color: this.getMemberColor(contactId),
+          lastMsg: msg,
+        });
+      } else if (contactId) {
+        contactMap.get(contactId)!.lastMsg = msg;
+      }
+    }
+    return Array.from(contactMap.values());
+  }
+
+  /** Obtiene los mensajes DM de un contacto específico */
+  getDmMessages(contactId: string): ChatMessage[] {
+    return this.canvasService.chatMessages().filter(m =>
+      m.isPrivate &&
+      ((m.sender._id === this.currentUserId && m.recipient?._id === contactId) ||
+       (m.sender._id === contactId && m.recipient?._id === this.currentUserId))
+    );
+  }
+
+  openDmContact(userId: string) {
+    this.dmActiveContactId = userId;
+    // Iniciar DM preseleccionando el contacto en el selector
+    this.chatRecipientId = userId;
+  }
+
+  backToDmList() {
+    this.dmActiveContactId = null;
+    this.chatRecipientId = '';
   }
 
   // ─── Historial de imágenes ───────────────────────────────────────────────

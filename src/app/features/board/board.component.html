@@ -380,6 +380,23 @@
             {{ unreadMessagesCount }}
           </span>
         </button>
+        <!-- Nueva pestaña DMs -->
+        <button (click)="selectTab('dms')"
+          class="flex-1 py-3 text-center text-xs font-bold uppercase tracking-widest transition-all duration-200 outline-none relative"
+          [ngClass]="activeTab === 'dms' 
+            ? 'text-white border-b-2 border-violet-500 bg-white/5' 
+            : 'text-gray-400 hover:text-white bg-transparent'">
+          <span class="flex items-center justify-center gap-1">
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            DMs
+          </span>
+          <span *ngIf="unreadDmCount > 0"
+            class="absolute top-1 right-1 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center bg-violet-500 text-white text-[7px] font-black rounded-full">
+            {{ unreadDmCount }}
+          </span>
+        </button>
       </div>
       
       <!-- Sub-info condicional del Header -->
@@ -395,6 +412,12 @@
           <h2 class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Historial</h2>
           <p class="text-[9px] text-gray-500 mt-0.5 font-mono">
             {{ canvasService.chatMessages().length }} mensajes
+          </p>
+        </div>
+        <div *ngIf="activeTab === 'dms'">
+          <h2 class="text-[10px] font-bold uppercase tracking-widest text-violet-400">Mensajes Privados</h2>
+          <p class="text-[9px] text-gray-500 mt-0.5 font-mono">
+            {{ getDmConversations().length }} conversaciones
           </p>
         </div>
         <div class="flex items-center gap-1.5">
@@ -523,7 +546,7 @@
             {{ (msg.sender.displayName || msg.sender.email || '?').charAt(0).toUpperCase() }}
           </div>
           
-          <!-- Burbuja de texto -->
+          <!-- Burbuja de texto con menciones resaltadas -->
           <div class="flex-1 px-3 py-1.5 text-xs border leading-relaxed break-words"
             [ngClass]="isMessageMentioningMe(msg)
               ? 'bg-amber-950/20 border-amber-500/40 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.05)] font-medium'
@@ -531,8 +554,8 @@
                 ? 'bg-violet-950/20 border-violet-500/35 text-violet-200 shadow-[0_0_8px_rgba(139,92,246,0.05)] font-medium'
                 : msg.sender._id === currentUserId
                   ? 'bg-neonBlue/10 border-neonBlue/30 text-white'
-                  : 'bg-white/5 border-white/10 text-gray-300'">
-            {{ msg.message }}
+                  : 'bg-white/5 border-white/10 text-gray-300'"
+            [innerHTML]="formatMessageText(msg.message)">
           </div>
         </div>
       </div>
@@ -540,8 +563,63 @@
 
     <!-- Input de envío de chat (Solo si activeTab === 'chat') -->
     <div *ngIf="activeTab === 'chat'" 
-      class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex flex-col gap-2">
+      class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex flex-col gap-2 relative">
       
+      <!-- Popup de sugerencias (comandos o menciones) -->
+      <div *ngIf="showSuggestions && suggestions.length > 0"
+        class="absolute bottom-full left-0 right-0 mx-3 mb-1 bg-[#0d0d14] border border-white/10 shadow-2xl overflow-hidden z-50"
+        style="border-radius: 4px;">
+        
+        <!-- Comandos -->
+        <ng-container *ngIf="suggestionType === 'command'">
+          <div class="px-3 py-1.5 border-b border-white/5 flex items-center gap-1.5">
+            <span class="text-[8px] uppercase tracking-widest font-bold text-emerald-500/70">Comandos</span>
+          </div>
+          <button *ngFor="let cmd of suggestions; let i = index"
+            (mousedown)="$event.preventDefault(); selectSuggestion(cmd)"
+            class="w-full flex flex-col px-3 py-2 text-left transition-colors border-b border-white/5 last:border-0"
+            [ngClass]="i === selectedSuggestionIndex 
+              ? 'bg-emerald-500/10 border-l-2 border-l-emerald-500' 
+              : 'hover:bg-white/5'">
+            <span class="text-[11px] font-mono font-bold" 
+              [class.text-emerald-400]="i === selectedSuggestionIndex"
+              [class.text-emerald-300]="i !== selectedSuggestionIndex">
+              {{ cmd.label }}
+            </span>
+            <span class="text-[9px] text-gray-500 mt-0.5">{{ cmd.description }}</span>
+            <span *ngIf="cmd.hostOnly" class="text-[8px] text-amber-500/70 font-mono mt-0.5">Solo Host</span>
+          </button>
+        </ng-container>
+
+        <!-- Menciones de usuarios -->
+        <ng-container *ngIf="suggestionType === 'mention'">
+          <div class="px-3 py-1.5 border-b border-white/5 flex items-center gap-1.5">
+            <span class="text-[8px] uppercase tracking-widest font-bold text-amber-500/70">Mencionar a</span>
+          </div>
+          <button *ngFor="let u of suggestions; let i = index"
+            (mousedown)="$event.preventDefault(); selectSuggestion(u)"
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors border-b border-white/5 last:border-0"
+            [ngClass]="i === selectedSuggestionIndex 
+              ? 'bg-amber-500/10 border-l-2 border-l-amber-500' 
+              : 'hover:bg-white/5'">
+            <!-- Avatar -->
+            <div class="w-6 h-6 flex-shrink-0 flex items-center justify-center text-[10px] font-black text-white"
+              [style.background-color]="getMemberColor(u.userId)"
+              [style.box-shadow]="'0 0 6px ' + getMemberColor(u.userId) + '50'">
+              {{ (u.displayName || u.email || '?').charAt(0).toUpperCase() }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <span class="text-[11px] font-bold block truncate"
+                [class.text-amber-300]="i === selectedSuggestionIndex"
+                [class.text-white]="i !== selectedSuggestionIndex">
+                @{{ (u.displayName || u.email.split('@')[0]).replace(' ', '') }}
+              </span>
+              <span class="text-[9px] text-gray-500 font-mono truncate block">{{ u.email }}</span>
+            </div>
+          </button>
+        </ng-container>
+      </div>
+
       <!-- Selector de Destinatario (Mensaje Privado) -->
       <div class="flex items-center gap-1.5 text-[9px] text-gray-400 font-mono uppercase tracking-wider">
         <span>Enviar a:</span>
@@ -557,9 +635,13 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <input type="text" [(ngModel)]="newMessageText" (keyup.enter)="sendMessage()"
-          [placeholder]="chatRecipientId ? 'Escribe un mensaje privado...' : 'Escribe un mensaje...'"
-          class="flex-1 bg-black/40 border border-white/10 px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-neonBlue/50" />
+        <input type="text" 
+          [(ngModel)]="newMessageText" 
+          (keyup.enter)="!showSuggestions && sendMessage()"
+          (input)="onChatInput($event)"
+          (keydown)="onChatKeyDown($event)"
+          [placeholder]="chatRecipientId ? 'Escribe un mensaje privado...' : 'Escribe un mensaje... (/ para comandos, @ para mencionar)'" 
+          class="flex-1 bg-black/40 border border-white/10 px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-neonBlue/50 transition-colors" />
         <button (click)="sendMessage()"
           class="btn-primary !p-2 flex items-center justify-center shrink-0 w-8 h-8 font-bold">
           <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -577,6 +659,156 @@
         <span class="text-amber-400/70">↑</span> Pasa el cursor sobre un usuario para ver la opción de expulsión
       </p>
     </div>
+
+    <!-- ═══ PESTAÑA 3: PANEL DE DMs (Mensajería Privada) ═══ -->
+    <ng-container *ngIf="activeTab === 'dms'">
+
+      <!-- Vista: Lista de Conversaciones -->
+      <div *ngIf="!dmActiveContactId"
+        class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- Estado vacío -->
+        <div *ngIf="getDmConversations().length === 0"
+          class="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-gray-600">
+          <div class="w-16 h-16 rounded-full bg-violet-500/5 border border-violet-500/15 flex items-center justify-center">
+            <svg class="w-7 h-7 text-violet-500/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div class="text-center">
+            <p class="text-[11px] uppercase tracking-widest text-gray-500 font-bold">Sin mensajes privados</p>
+            <p class="text-[10px] text-gray-600 mt-1">Usa <span class="text-violet-400 font-mono">/w @usuario</span> en el chat o el selector de destinatario</p>
+          </div>
+        </div>
+
+        <!-- Lista de conversaciones -->
+        <div class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <button *ngFor="let conv of getDmConversations()"
+            (click)="openDmContact(conv.userId)"
+            class="w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/4 transition-colors text-left group">
+            <!-- Avatar -->
+            <div class="relative flex-shrink-0">
+              <div class="w-10 h-10 flex items-center justify-center text-sm font-black text-white"
+                [style.background-color]="conv.color"
+                [style.box-shadow]="'0 0 10px ' + conv.color + '40'">
+                {{ (conv.displayName || conv.email || '?').charAt(0).toUpperCase() }}
+              </div>
+              <!-- Indicador online -->
+              <span *ngIf="canvasService.connectedUsers().find(u => u.userId === conv.userId)"
+                class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0d0d14] rounded-full"></span>
+            </div>
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline justify-between gap-1">
+                <span class="text-xs font-bold text-white truncate">
+                  {{ conv.displayName || conv.email.split('@')[0] }}
+                </span>
+                <span class="text-[8px] text-gray-600 font-mono flex-shrink-0">
+                  {{ conv.lastMsg.createdAt | date:'HH:mm' }}
+                </span>
+              </div>
+              <p class="text-[10px] text-gray-500 truncate mt-0.5 font-mono">
+                {{ conv.lastMsg.sender._id === currentUserId ? 'Tú: ' : '' }}{{ conv.lastMsg.message }}
+              </p>
+            </div>
+            <!-- Chevron -->
+            <svg class="w-3.5 h-3.5 text-gray-600 group-hover:text-violet-400 transition-colors flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Vista: Hilo de mensajes con un contacto -->
+      <div *ngIf="dmActiveContactId" class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- Header del hilo -->
+        <div class="px-3 py-2.5 border-b border-white/10 flex items-center gap-2.5 bg-black/20 flex-shrink-0">
+          <button (click)="backToDmList()" class="text-gray-500 hover:text-white transition-colors">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <!-- Avatar del contacto -->
+          <ng-container *ngFor="let conv of getDmConversations()">
+            <ng-container *ngIf="conv.userId === dmActiveContactId">
+              <div class="w-7 h-7 flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                [style.background-color]="conv.color"
+                [style.box-shadow]="'0 0 8px ' + conv.color + '50'">
+                {{ (conv.displayName || conv.email || '?').charAt(0).toUpperCase() }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-white truncate">{{ conv.displayName || conv.email.split('@')[0] }}</p>
+                <p class="text-[9px] text-violet-400/70 font-mono">Conversación privada</p>
+              </div>
+            </ng-container>
+          </ng-container>
+          <!-- Botón: escribir al contacto desde chat -->
+          <button (click)="selectTab('chat')" class="flex-shrink-0 text-gray-500 hover:text-violet-400 transition-colors" title="Abrir en Chat">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Burbujas de mensajes -->
+        <div class="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div *ngIf="getDmMessages(dmActiveContactId).length === 0"
+            class="flex flex-col items-center justify-center h-full gap-2 text-gray-600">
+            <p class="text-[10px] uppercase tracking-widest">Sin mensajes aún</p>
+          </div>
+
+          <ng-container *ngFor="let msg of getDmMessages(dmActiveContactId)">
+            <!-- Mensaje enviado (mío) -->
+            <div *ngIf="msg.sender._id === currentUserId" class="flex justify-end">
+              <div class="max-w-[85%] flex flex-col items-end gap-0.5">
+                <div class="px-3 py-2 text-xs text-white bg-violet-600/70 border border-violet-500/40 leading-relaxed break-words"
+                  style="border-radius: 12px 12px 2px 12px;"
+                  [innerHTML]="formatMessageText(msg.message)">
+                </div>
+                <span class="text-[8px] text-gray-600 font-mono">{{ msg.createdAt | date:'HH:mm' }}</span>
+              </div>
+            </div>
+
+            <!-- Mensaje recibido -->
+            <div *ngIf="msg.sender._id !== currentUserId" class="flex items-end gap-2">
+              <div class="w-5 h-5 flex-shrink-0 flex items-center justify-center text-[8px] font-black text-white mb-4"
+                [style.background-color]="getMemberColor(msg.sender._id)"
+                [style.box-shadow]="'0 0 5px ' + getMemberColor(msg.sender._id) + '50'">
+                {{ (msg.sender.displayName || msg.sender.email || '?').charAt(0).toUpperCase() }}
+              </div>
+              <div class="max-w-[85%] flex flex-col items-start gap-0.5">
+                <div class="px-3 py-2 text-xs text-gray-200 bg-white/8 border border-white/10 leading-relaxed break-words"
+                  style="border-radius: 12px 12px 12px 2px;"
+                  [innerHTML]="formatMessageText(msg.message)">
+                </div>
+                <span class="text-[8px] text-gray-600 font-mono">{{ msg.createdAt | date:'HH:mm' }}</span>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+
+        <!-- Input de respuesta rápida -->
+        <div class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex gap-2">
+          <input type="text"
+            [(ngModel)]="newMessageText"
+            (keyup.enter)="sendMessage()"
+            (input)="onChatInput($event)"
+            (keydown)="onChatKeyDown($event)"
+            placeholder="Escribe un mensaje privado..."
+            class="flex-1 bg-black/40 border border-violet-500/20 px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-violet-500/50 transition-colors" />
+          <button (click)="sendMessage()"
+            class="!p-2 flex items-center justify-center shrink-0 w-8 h-8 font-bold bg-violet-600/70 hover:bg-violet-500/80 border border-violet-500/40 transition-colors">
+            <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </ng-container>
+
   </aside>
 
   <!-- ═══ OVERLAY DE TIEMPO DE DESCANSO (BREAK TIME) ═══ -->

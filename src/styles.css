@@ -145,4 +145,20 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-}
+}
+
+/* ═══════════════════════════════════════════════════════
+   CHAT — ESTILOS DE MENCIÓN
+   ═══════════════════════════════════════════════════════ */
+
+/* Mención @usuario en mensajes del chat */
+.mention-tag {
+  color: #f59e0b !important;
+  font-weight: 700;
+  background-color: rgba(245, 158, 11, 0.12);
+  padding: 0 3px;
+  border-radius: 0 !important;
+  font-family: 'Inter', monospace;
+  letter-spacing: 0.02em;
+}
+
