@@ -491,9 +491,22 @@
       <div *ngFor="let msg of canvasService.chatMessages()" class="flex flex-col gap-1 max-w-full">
         <!-- Cabecera del mensaje: Nombre y Hora -->
         <div class="flex items-baseline justify-between gap-2 px-1">
-          <span class="text-[10px] font-bold text-gray-300 truncate max-w-[170px]" 
+          <span class="text-[10px] font-bold truncate max-w-[170px]" 
+            [class.text-violet-400]="msg.isPrivate"
+            [class.text-gray-300]="!msg.isPrivate"
             [title]="msg.sender.displayName || msg.sender.email">
-            {{ msg.sender.displayName || msg.sender.email.split('@')[0] }}
+            <ng-container *ngIf="!msg.isPrivate">
+              {{ msg.sender.displayName || msg.sender.email.split('@')[0] }}
+            </ng-container>
+            <ng-container *ngIf="msg.isPrivate">
+              <span class="text-violet-400">🔒 </span>
+              <ng-container *ngIf="msg.sender._id === currentUserId">
+                Tú para {{ getRecipientName(msg) }}
+              </ng-container>
+              <ng-container *ngIf="msg.sender._id !== currentUserId">
+                {{ msg.sender.displayName || msg.sender.email.split('@')[0] }} (Privado)
+              </ng-container>
+            </ng-container>
           </span>
           <span class="text-[9px] text-gray-500 font-mono">
             {{ msg.createdAt | date:'HH:mm' }}
@@ -512,9 +525,13 @@
           
           <!-- Burbuja de texto -->
           <div class="flex-1 px-3 py-1.5 text-xs border leading-relaxed break-words"
-            [ngClass]="msg.sender._id === currentUserId
-              ? 'bg-neonBlue/10 border-neonBlue/30 text-white'
-              : 'bg-white/5 border-white/10 text-gray-300'">
+            [ngClass]="isMessageMentioningMe(msg)
+              ? 'bg-amber-950/20 border-amber-500/40 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.05)] font-medium'
+              : msg.isPrivate
+                ? 'bg-violet-950/20 border-violet-500/35 text-violet-200 shadow-[0_0_8px_rgba(139,92,246,0.05)] font-medium'
+                : msg.sender._id === currentUserId
+                  ? 'bg-neonBlue/10 border-neonBlue/30 text-white'
+                  : 'bg-white/5 border-white/10 text-gray-300'">
             {{ msg.message }}
           </div>
         </div>
@@ -523,18 +540,35 @@
 
     <!-- Input de envío de chat (Solo si activeTab === 'chat') -->
     <div *ngIf="activeTab === 'chat'" 
-      class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex items-center gap-2">
-      <input type="text" [(ngModel)]="newMessageText" (keyup.enter)="sendMessage()"
-        placeholder="Escribe un mensaje..."
-        class="flex-1 bg-black/40 border border-white/10 px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-neonBlue/50" />
-      <button (click)="sendMessage()"
-        class="btn-primary !p-2 flex items-center justify-center shrink-0 w-8 h-8 font-bold">
-        <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <line x1="22" y1="2" x2="11" y2="13"></line>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-        </svg>
-      </button>
+      class="p-3 border-t border-white/10 flex-shrink-0 bg-black/30 flex flex-col gap-2">
+      
+      <!-- Selector de Destinatario (Mensaje Privado) -->
+      <div class="flex items-center gap-1.5 text-[9px] text-gray-400 font-mono uppercase tracking-wider">
+        <span>Enviar a:</span>
+        <select [(ngModel)]="chatRecipientId" 
+          class="bg-black/50 border border-white/10 text-[9px] text-white px-2 py-0.5 outline-none focus:border-neonBlue/30 cursor-pointer">
+          <option value="">Todos (Público)</option>
+          <option *ngFor="let u of canvasService.connectedUsers()" 
+            [value]="u.userId" 
+            [class.hidden]="u.userId === currentUserId">
+            🔒 {{ u.displayName || u.email.split('@')[0] }}
+          </option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <input type="text" [(ngModel)]="newMessageText" (keyup.enter)="sendMessage()"
+          [placeholder]="chatRecipientId ? 'Escribe un mensaje privado...' : 'Escribe un mensaje...'"
+          class="flex-1 bg-black/40 border border-white/10 px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-neonBlue/50" />
+        <button (click)="sendMessage()"
+          class="btn-primary !p-2 flex items-center justify-center shrink-0 w-8 h-8 font-bold">
+          <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Footer del panel: instrucción para host (Solo si activeTab === 'users' y es host) -->
@@ -544,6 +578,51 @@
       </p>
     </div>
   </aside>
+
+  <!-- ═══ OVERLAY DE TIEMPO DE DESCANSO (BREAK TIME) ═══ -->
+  <div *ngIf="canvasService.breakState() as state"
+    class="absolute inset-0 bg-darkBg/60 backdrop-blur-md z-30 flex flex-col items-center justify-center pointer-events-auto"
+    (mousedown)="$event.stopPropagation()"
+    (click)="$event.stopPropagation()">
+    
+    <div class="glass border border-white/10 p-8 max-w-md w-full text-center flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden"
+      style="background: rgba(13, 13, 18, 0.85); border-radius: 12px;">
+      
+      <!-- Glow superior neón -->
+      <div class="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Icono de taza de café -->
+      <div class="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/25 flex items-center justify-center text-violet-400 relative">
+        <svg class="w-8 h-8 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+          <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/>
+          <line x1="10" y1="1" x2="10" y2="4"/>
+          <line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <h2 class="text-xs font-black tracking-widest text-violet-400 uppercase">Tiempo de descanso</h2>
+        <p class="text-[10px] text-gray-400 font-medium">Iniciado por &#64;{{ state.initiatedBy || 'Host' }}</p>
+      </div>
+
+      <!-- Reloj de cuenta regresiva -->
+      <div class="font-mono text-5xl font-extrabold tracking-widest text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] my-2">
+        {{ (breakTimeRemaining / 60) | number:'2.0-0' }}:{{ (breakTimeRemaining % 60) | number:'2.0-0' }}
+      </div>
+
+      <p class="text-[11px] leading-relaxed text-gray-400 max-w-xs">
+        Las acciones de edición y dibujo en la pizarra están temporalmente bloqueadas. Aprovecha para estirarte, tomar agua o conversar en el chat.
+      </p>
+
+      <!-- Botón de cancelación del host -->
+      <button *ngIf="isHost" (click)="endBreakTime()"
+        class="mt-2 w-full py-2.5 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 hover:text-white transition-all text-[10px] font-bold uppercase tracking-widest cursor-pointer">
+        Finalizar Descanso
+      </button>
+    </div>
+  </div>
 
   <!-- ═══ CAPA DEL LIENZO INFINITO ═══ -->
   <div class="absolute inset-0 z-10 w-full h-full pointer-events-auto canvas-layer"

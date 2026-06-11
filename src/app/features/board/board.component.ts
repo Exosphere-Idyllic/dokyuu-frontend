@@ -1,8 +1,8 @@
-import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef, signal, effect } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasService, BoardElement, ImageHistoryItem, ImageHistoryResult } from '../../core/canvas/canvas.service';
+import { CanvasService, BoardElement, ImageHistoryItem, ImageHistoryResult, ChatMessage } from '../../core/canvas/canvas.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { BoardsService } from '../../core/boards/boards.service';
 import { TasksService, Task } from '../../core/tasks/tasks.service';
@@ -28,6 +28,37 @@ export class BoardComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   route = inject(ActivatedRoute);
   router = inject(Router);
+
+  chatRecipientId = '';
+  breakTimeRemaining = 0;
+  breakInterval: any = null;
+
+  constructor() {
+    effect(() => {
+      const state = this.canvasService.breakState();
+      if (this.breakInterval) {
+        clearInterval(this.breakInterval);
+        this.breakInterval = null;
+      }
+      if (state && state.endTime) {
+        const updateTimer = () => {
+          const diff = Math.ceil((state.endTime - Date.now()) / 1000);
+          if (diff <= 0) {
+            this.breakTimeRemaining = 0;
+            this.canvasService.breakState.set(null);
+            clearInterval(this.breakInterval);
+            this.breakInterval = null;
+          } else {
+            this.breakTimeRemaining = diff;
+          }
+        };
+        updateTimer();
+        this.breakInterval = setInterval(updateTimer, 1000);
+      } else {
+        this.breakTimeRemaining = 0;
+      }
+    });
+  }
 
   boardId!: string;
   isSaving = false;
@@ -180,6 +211,23 @@ export class BoardComponent implements OnInit, OnDestroy {
       } else {
         this.scrollToBottom();
       }
+
+      if (msg.sender._id !== this.currentUserId) {
+        const currentUser = this.authService.currentUser();
+        if (currentUser) {
+          const myName = (currentUser.displayName || '').toLowerCase().replace(/\s+/g, '');
+          const myEmailPrefix = (currentUser.email || '').split('@')[0].toLowerCase();
+          const cleanMessage = msg.message.toLowerCase();
+
+          const hasMention = (myName && cleanMessage.includes('@' + myName)) ||
+                              (myEmailPrefix && cleanMessage.includes('@' + myEmailPrefix));
+
+          if (hasMention) {
+            this.playMentionSound();
+            this.canvasService.addNotification('Has sido mencionado en el chat', 'info');
+          }
+        }
+      }
     };
 
     this.canvasService.connect(this.boardId, token);
@@ -213,6 +261,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     this.canvasService.disconnect();
     // Cleanup capture session when leaving the board
     this.tasksService.stopCapture();
+    if (this.breakInterval) {
+      clearInterval(this.breakInterval);
+      this.breakInterval = null;
+    }
   }
 
   // ─── Expulsión de usuarios ────────────────────────────────────────────────
@@ -260,9 +312,83 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   sendMessage() {
     if (!this.newMessageText || !this.newMessageText.trim()) return;
-    this.canvasService.sendChatMessage(this.boardId, this.newMessageText.trim());
+
+    let text = this.newMessageText.trim();
+    let recipientId = this.chatRecipientId;
+    let isPrivate = recipientId !== '';
+
+    // Detectar comandos privados como /w @usuario mensaje
+    const whisperMatch = text.match(/^\/(w|msg|pm)\s+@([^\s]+)\s+(.+)$/i);
+    if (whisperMatch) {
+      const targetUsername = whisperMatch[2].toLowerCase();
+      const actualMsg = whisperMatch[3];
+
+      const foundUser = this.canvasService.connectedUsers().find(u => 
+        (u.displayName && u.displayName.toLowerCase().replace(/\s+/g, '') === targetUsername) ||
+        u.email.split('@')[0].toLowerCase() === targetUsername
+      );
+      if (foundUser) {
+        recipientId = foundUser.userId;
+        isPrivate = true;
+        text = actualMsg;
+      }
+    }
+
+    this.canvasService.sendChatMessage(this.boardId, text, recipientId, isPrivate);
     this.newMessageText = '';
     this.scrollToBottom();
+  }
+
+  playMentionSound() {
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      const playTone = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = ctx.currentTime;
+      playTone(880, now, 0.3);
+      playTone(1318.51, now + 0.1, 0.4);
+    } catch (e) {
+      console.warn('No se pudo jugar el sonido de mención:', e);
+    }
+  }
+
+  isMessageMentioningMe(msg: ChatMessage): boolean {
+    if (msg.sender._id === this.currentUserId) return false;
+    const currentUser = this.authService.currentUser();
+    if (!currentUser) return false;
+    const myName = (currentUser.displayName || '').toLowerCase().replace(/\s+/g, '');
+    const myEmailPrefix = (currentUser.email || '').split('@')[0].toLowerCase();
+    const cleanMessage = msg.message.toLowerCase();
+    return (!!myName && cleanMessage.includes('@' + myName)) ||
+           (!!myEmailPrefix && cleanMessage.includes('@' + myEmailPrefix));
+  }
+
+  getRecipientName(msg: ChatMessage): string {
+    if (!msg.recipient) return '';
+    return msg.recipient.displayName || (msg.recipient.email ? msg.recipient.email.split('@')[0] : '');
+  }
+
+  endBreakTime() {
+    if (!this.isHost) return;
+    this.canvasService.sendChatMessage(this.boardId, '/break time stop');
   }
 
   scrollToBottom() {
@@ -307,6 +433,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   insertImageFromHistory(img: ImageHistoryItem) {
+    if (this.canvasService.breakState()) return;
     const user = this.authService.currentUser();
     const MAX_W = 400;
     const MAX_H = 300;
@@ -505,6 +632,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   // ─── Motor de elementos ───────────────────────────────────────────────────
 
   addNote(canvasX?: number, canvasY?: number) {
+    if (this.canvasService.breakState()) return;
     const user = this.authService.currentUser();
     const x = canvasX !== undefined ? canvasX : (window.innerWidth / 2 - this.panX) / this.zoom - 125;
     const y = canvasY !== undefined ? canvasY : (window.innerHeight / 2 - this.panY) / this.zoom - 80;
@@ -528,6 +656,7 @@ export class BoardComponent implements OnInit, OnDestroy {
   }
 
   addShape(shape: 'square' | 'circle' | 'triangle' | 'arrow' | 'line', canvasX?: number, canvasY?: number) {
+    if (this.canvasService.breakState()) return;
     const user = this.authService.currentUser();
     const x = canvasX !== undefined ? canvasX : (window.innerWidth / 2 - this.panX) / this.zoom - 50;
     const y = canvasY !== undefined ? canvasY : (window.innerHeight / 2 - this.panY) / this.zoom - 50;
@@ -661,12 +790,14 @@ export class BoardComponent implements OnInit, OnDestroy {
 
 
   triggerImageUpload() {
+    if (this.canvasService.breakState()) return;
     this.uploadError = null;
     this.imageInputRef.nativeElement.value = '';
     this.imageInputRef.nativeElement.click();
   }
 
   onImageFileSelected(event: Event) {
+    if (this.canvasService.breakState()) return;
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 

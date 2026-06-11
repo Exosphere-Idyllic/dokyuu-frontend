@@ -81,6 +81,8 @@ export interface ChatMessage {
   sender: ChatSender;
   message: string;
   createdAt: string;
+  recipient?: ChatSender;
+  isPrivate?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -95,6 +97,7 @@ export class CanvasService {
   // Lista de usuarios actualmente conectados a la sala
   public connectedUsers = signal<ConnectedUser[]>([]);
   public chatMessages = signal<ChatMessage[]>([]);
+  public breakState = signal<{ duration: number; endTime: number; initiatedBy?: string } | null>(null);
 
   // Evento para notificar al componente que el usuario fue expulsado
   public onKicked: ((data: { boardId: string; message: string }) => void) | null = null;
@@ -196,6 +199,11 @@ export class CanvasService {
         this.onKicked(data);
       }
     });
+
+    // Recibir actualizaciones de tiempo de descanso
+    this.socket.on('board:break', (data: { duration: number; endTime: number; initiatedBy?: string }) => {
+      this.breakState.set(data.duration > 0 ? data : null);
+    });
   }
 
   emitCursorMove(boardId: string, x: number, y: number) {
@@ -211,9 +219,9 @@ export class CanvasService {
     }
   }
 
-  sendChatMessage(boardId: string, message: string) {
+  sendChatMessage(boardId: string, message: string, recipientId?: string, isPrivate?: boolean) {
     if (this.socket?.connected) {
-      this.socket.emit('chat:message', { boardId, message });
+      this.socket.emit('chat:message', { boardId, message, recipientId, isPrivate });
     }
   }
 
@@ -261,6 +269,7 @@ export class CanvasService {
       this.socket.disconnect();
       this.activeCursors.set({});
       this.connectedUsers.set([]);
+      this.breakState.set(null);
     }
   }
 }
