@@ -695,7 +695,7 @@
                 {{ (conv.displayName || conv.email || '?').charAt(0).toUpperCase() }}
               </div>
               <!-- Indicador online -->
-              <span *ngIf="canvasService.connectedUsers().find(u => u.userId === conv.userId)"
+              <span *ngIf="isUserConnected(conv.userId)"
                 class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-[#0d0d14] rounded-full"></span>
             </div>
             <!-- Info -->

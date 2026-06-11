@@ -447,6 +447,10 @@ export class BoardComponent implements OnInit, OnDestroy {
     return user?.cursorColor || '#4F46E5';
   }
 
+  isUserConnected(userId: string): boolean {
+    return !!this.canvasService.connectedUsers().find(u => u.userId === userId);
+  }
+
   // ─── Autocompletado del Chat ───────────────────────────────────────────────
 
   onChatInput(event: Event) {
