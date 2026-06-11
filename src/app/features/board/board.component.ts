@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef, signal, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, ViewChild, ElementRef, signal, effect, computed } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -74,7 +74,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       } else {
         this.breakTimeRemaining = 0;
       }
-    });
+    }, { allowSignalWrites: true });
   }
 
   boardId!: string;
@@ -352,6 +352,9 @@ export class BoardComponent implements OnInit, OnDestroy {
 
     let text = this.newMessageText.trim();
     let recipientId = this.chatRecipientId;
+    if (this.activeTab === 'dms' && this.dmActiveContactId) {
+      recipientId = this.dmActiveContactId;
+    }
     let isPrivate = recipientId !== '';
 
     // Detectar comandos privados como /w @usuario mensaje
@@ -373,6 +376,8 @@ export class BoardComponent implements OnInit, OnDestroy {
 
     this.canvasService.sendChatMessage(this.boardId, text, recipientId, isPrivate);
     this.newMessageText = '';
+    this.showSuggestions = false;
+    this.suggestionType = null;
     this.scrollToBottom();
   }
 
@@ -524,18 +529,22 @@ export class BoardComponent implements OnInit, OnDestroy {
 
   /** Renderiza el texto del mensaje resaltando @menciones en dorado */
   formatMessageText(text: string): string {
-    return text.replace(/@([\w]+)/g, '<span class="mention-tag">@$1</span>');
+    const div = document.createElement('div');
+    div.textContent = text;
+    const escaped = div.innerHTML;
+    return escaped.replace(/@([\w]+)/g, '<span class="mention-tag">@$1</span>');
   }
 
   // ─── Panel DMs ──────────────────────────────────────────────────────────────
 
-  /** Obtiene la lista de contactos con quienes hay DMs, con último mensaje */
-  getDmConversations(): { userId: string; displayName: string; email: string; color: string; lastMsg: ChatMessage }[] {
+  /** Obtiene la lista de contactos con quienes hay DMs, con último mensaje, de forma computada reactiva */
+  dmConversations = computed(() => {
     const msgs = this.canvasService.chatMessages().filter(m => m.isPrivate);
     const contactMap = new Map<string, any>();
+    const currentId = this.currentUserId;
 
     for (const msg of msgs) {
-      const isSender = msg.sender._id === this.currentUserId;
+      const isSender = msg.sender._id === currentId;
       const contactId = isSender ? msg.recipient?._id : msg.sender._id;
       const contactName = isSender
         ? (msg.recipient?.displayName || msg.recipient?.email?.split('@')[0] || '')
@@ -555,7 +564,7 @@ export class BoardComponent implements OnInit, OnDestroy {
       }
     }
     return Array.from(contactMap.values());
-  }
+  });
 
   /** Obtiene los mensajes DM de un contacto específico */
   getDmMessages(contactId: string): ChatMessage[] {

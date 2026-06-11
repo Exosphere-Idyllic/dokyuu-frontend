@@ -417,7 +417,7 @@
         <div *ngIf="activeTab === 'dms'">
           <h2 class="text-[10px] font-bold uppercase tracking-widest text-violet-400">Mensajes Privados</h2>
           <p class="text-[9px] text-gray-500 mt-0.5 font-mono">
-            {{ getDmConversations().length }} conversaciones
+            {{ dmConversations().length }} conversaciones
           </p>
         </div>
         <div class="flex items-center gap-1.5">
@@ -612,7 +612,7 @@
               <span class="text-[11px] font-bold block truncate"
                 [class.text-amber-300]="i === selectedSuggestionIndex"
                 [class.text-white]="i !== selectedSuggestionIndex">
-                @{{ (u.displayName || u.email.split('@')[0]).replace(' ', '') }}
+                @{{ (u.displayName || u.email.split('@')[0]).split(' ').join('') }}
               </span>
               <span class="text-[9px] text-gray-500 font-mono truncate block">{{ u.email }}</span>
             </div>
@@ -668,7 +668,7 @@
         class="flex-1 flex flex-col overflow-hidden">
 
         <!-- Estado vacío -->
-        <div *ngIf="getDmConversations().length === 0"
+        <div *ngIf="dmConversations().length === 0"
           class="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-gray-600">
           <div class="w-16 h-16 rounded-full bg-violet-500/5 border border-violet-500/15 flex items-center justify-center">
             <svg class="w-7 h-7 text-violet-500/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -683,7 +683,7 @@
 
         <!-- Lista de conversaciones -->
         <div class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <button *ngFor="let conv of getDmConversations()"
+          <button *ngFor="let conv of dmConversations()"
             (click)="openDmContact(conv.userId)"
             class="w-full flex items-center gap-3 px-4 py-3.5 border-b border-white/5 hover:bg-white/4 transition-colors text-left group">
             <!-- Avatar -->
@@ -730,7 +730,7 @@
             </svg>
           </button>
           <!-- Avatar del contacto -->
-          <ng-container *ngFor="let conv of getDmConversations()">
+          <ng-container *ngFor="let conv of dmConversations()">
             <ng-container *ngIf="conv.userId === dmActiveContactId">
               <div class="w-7 h-7 flex items-center justify-center text-xs font-black text-white flex-shrink-0"
                 [style.background-color]="conv.color"
